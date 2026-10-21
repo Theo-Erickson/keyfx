@@ -1,0 +1,2174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>[hidden]{display:none!important}body{margin:0}</style>
+<title>FUTO Tweaks Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Roboto:wght@400;500&display=swap">
+</head>
+<body>
+<style>
+/* Layout: a single settings column (two on wide screens) above a phone-width mock keyboard
+   docked to the bottom, summoned by a floating button pinned to the top-right corner. */
+:root {
+  --bg: #EDEFF3;
+  --surface: #FFFFFF;
+  --surface-2: #F5F6F9;
+  --fg: #151820;
+  --muted: #5B6273;
+  --line: #DADEE7;
+  --accent: #8AB4F8;
+  --accent-dark: #2C5BC9;
+  --accent-ink: var(--accent-dark);
+  --on-accent: #0B1530;
+  --danger: #C2410C;
+  --font-display: "Sora", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-keys: "Roboto", system-ui, sans-serif;
+
+  /* Mock keyboard palette, dark by default like FUTO's default theme */
+  --kb-bg: #1A1C21;
+  --kb-key: #2D3038;
+  --kb-key-2: #3B3F49;
+  --kb-key-pressed: #4A4F5B;
+  --kb-label: #E8EAED;
+  --kb-label-2: #AEB3BE;
+  --kb-strip: #22252B;
+  --kb-field: #15171B;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1015;
+    --surface: #171A21;
+    --surface-2: #1E222B;
+    --fg: #E6E9EF;
+    --muted: #9AA1B1;
+    --line: #2A2F3A;
+    --accent-ink: var(--accent);
+    --danger: #FB923C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1015;
+  --surface: #171A21;
+  --surface-2: #1E222B;
+  --fg: #E6E9EF;
+  --muted: #9AA1B1;
+  --line: #2A2F3A;
+  --accent-ink: var(--accent);
+  --danger: #FB923C;
+  color-scheme: dark;
+}
+.kb-light {
+  --kb-bg: #E4E7EC;
+  --kb-key: #FFFFFF;
+  --kb-key-2: #CDD2DB;
+  --kb-key-pressed: #B9BFCA;
+  --kb-label: #1C1F25;
+  --kb-label-2: #4E5563;
+  --kb-strip: #D9DDE4;
+  --kb-field: #F7F8FA;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-tap-highlight-color: transparent;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: var(--bg);
+}
+
+.page {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+  transition: padding-bottom 0.25s ease;
+}
+body.kb-open .page { padding-bottom: calc(var(--dock-h, 380px) + 32px); }
+
+/* Header */
+.intro { display: grid; gap: 10px; padding-right: 64px; margin-bottom: 18px; }
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(26px, 5vw, 36px);
+  line-height: 1.1;
+  margin: 0;
+  text-wrap: balance;
+}
+.intro p { margin: 0; color: var(--muted); max-width: 62ch; }
+.intro-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+
+/* Buttons */
+.btn {
+  font: 500 14px/1 var(--font-body);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 10px 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn:hover { border-color: var(--accent-ink); }
+.btn.primary { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+.btn.small { padding: 7px 12px; font-size: 13px; }
+.btn:focus-visible, .seg button:focus-visible, .switch input:focus-visible + span, input[type="range"]:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+
+/* Floating keyboard button: stays in the top-right corner while the settings scroll */
+#kbFab {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  right: calc(max(16px, env(safe-area-inset-right, 0px)));
+  z-index: 40;
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+  border: none;
+  background: var(--accent);
+  color: var(--on-accent);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+}
+#kbFab svg { width: 26px; height: 26px; }
+#kbFab[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+
+/* Sections and effect cards */
+.section { margin-top: 26px; }
+.section h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 19px;
+  margin: 0 0 4px;
+}
+.section > p { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+.cards { display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 880px) { .cards { grid-template-columns: 1fr 1fr; align-items: start; } }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.card.off .fields { opacity: 0.45; }
+.card-head { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.card-head h3 { font-family: var(--font-display); font-weight: 600; font-size: 16px; margin: 0; }
+.card-head p { margin: 2px 0 0; font-size: 13.5px; color: var(--muted); }
+.tag {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  vertical-align: 2px;
+  white-space: nowrap;
+}
+
+.fields { display: grid; gap: 12px; transition: opacity 0.2s; }
+.field { display: grid; gap: 6px; }
+.field-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.flabel { font-size: 13.5px; font-weight: 500; }
+.field output {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+input[type="range"] { width: 100%; accent-color: var(--accent-ink); margin: 0; height: 24px; }
+input[type="color"] { width: 44px; height: 30px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 2px; }
+
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button {
+  font: 500 13px/1 var(--font-body);
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--fg);
+  cursor: pointer;
+}
+.seg button[aria-checked="true"] { background: var(--accent); border-color: transparent; color: var(--on-accent); }
+
+.switch { position: relative; display: inline-flex; flex: none; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch span {
+  width: 46px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--line);
+  position: relative;
+  transition: background 0.2s;
+}
+.switch span::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s;
+}
+.switch input:checked + span { background: var(--accent-ink); }
+.switch input:checked + span::after { transform: translateX(18px); }
+.inline-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13.5px; font-weight: 500; }
+
+.card-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.note { width: 100%; min-height: 64px; resize: vertical; font: 14px/1.45 var(--font-body); color: var(--fg); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.has-note { color: var(--accent-ink); }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.swatch { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
+.swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--accent-ink); }
+
+/* Export sheet */
+#exportSheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(10, 12, 16, 0.55);
+  display: grid;
+  place-items: end center;
+  padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+#exportSheet .sheet { background: var(--surface); border-radius: 18px; padding: 18px; width: min(640px, 100%); display: grid; gap: 12px; max-height: 80vh; }
+#exportSheet h2 { font-family: var(--font-display); font-size: 18px; margin: 0; }
+#exportText { width: 100%; min-height: 220px; font: 12.5px/1.45 var(--font-mono); background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; resize: vertical; }
+
+/* ---------- Mock keyboard dock ---------- */
+#dock {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  width: min(100%, 480px);
+  transform: translate(-50%, 105%);
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: 30;
+  background: var(--kb-bg);
+  color: var(--kb-label);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+}
+#dock.open { transform: translate(-50%, 0); }
+.strip { background: var(--kb-strip); padding: 8px 12px 6px; }
+.strip-label { font: 500 10.5px/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--kb-label-2); display: flex; justify-content: space-between; }
+.strip-label button { font: inherit; letter-spacing: inherit; color: inherit; background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline; }
+#field {
+  margin-top: 6px;
+  background: var(--kb-field);
+  border-radius: 10px;
+  padding: 7px 10px;
+  height: 66px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 15px/1.4 var(--font-keys);
+  color: var(--kb-label);
+}
+#caret { display: inline-block; width: 2px; height: 1.2em; margin: 0 -1px; vertical-align: -0.2em; background: var(--accent); animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+#sugg { display: grid; grid-template-columns: 1fr 1.3fr 1fr; height: 42px; align-items: center; padding: 0 6px; }
+#sugg button {
+  font: 400 15px/1 var(--font-keys);
+  color: var(--kb-label);
+  background: none;
+  border: none;
+  height: 100%;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#sugg button.mid { font-weight: 500; border-inline: 1px solid color-mix(in srgb, var(--kb-label) 15%, transparent); }
+#sugg .ch { display: inline-block; transition: transform 0.12s ease, color 0.12s ease, text-shadow 0.12s ease; }
+#sugg .ch.lit { color: var(--accent); transform: scale(var(--lit-grow, 1.2)); text-shadow: 0 0 10px var(--accent); }
+
+#kb { display: grid; gap: 7px; padding: 4px 4px 10px; }
+.row { display: flex; gap: 5px; }
+.row.inset { padding-inline: 5%; }
+.key {
+  flex: 1 1 0;
+  height: 46px;
+  border-radius: 9px;
+  background: var(--kb-key);
+  display: grid;
+  place-items: center;
+  font: 400 21px/1 var(--font-keys);
+  color: var(--kb-label);
+  position: relative;
+}
+.numrow .key { height: 38px; font-size: 17px; background: transparent; }
+.key.mod { background: var(--kb-key-2); font-size: 18px; }
+.key.space { color: var(--kb-label-2); font-size: 12px; }
+.key.pressed { background: var(--kb-key-pressed); }
+.key .lab { transition: opacity 0.15s; }
+.numrow.hop .lab { opacity: 0.12; }
+#dock.tp .key .lab { opacity: var(--tp-label, 0.2); }
+#dock.shift-on .key.shift { color: var(--accent); }
+#dock.shift-lock .key.shift { color: var(--accent); text-decoration: underline; }
+
+#fx { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2; }
+#popup { position: absolute; z-index: 3; pointer-events: none; }
+#popup .pk {
+  position: absolute;
+  width: 40px;
+  height: 46px;
+  margin: -23px 0 0 -20px;
+  border-radius: 10px;
+  background: var(--kb-key-2);
+  color: var(--kb-label);
+  display: grid;
+  place-items: center;
+  font: 400 21px/1 var(--font-keys);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+#popup .pk.sel { background: var(--accent); color: var(--on-accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .page, #dock, .switch span, .switch span::after { transition: none; }
+}
+</style>
+
+<button id="kbFab" type="button" aria-pressed="false" aria-label="Show test keyboard" title="Show test keyboard">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="2.5" y="6" width="19" height="12" rx="2.5"></rect>
+    <path d="M6 10h.01M9 10h.01M12 10h.01M15 10h.01M18 10h.01M7 14h10"></path>
+  </svg>
+</button>
+
+<div class="page">
+  <header class="intro">
+    <span class="eyebrow">FUTO Tweaks 1.1 · effect lab</span>
+    <h1>FUTO Tweaks Lab</h1>
+    <p>Tune every effect against a mock of FUTO Keyboard. Tap the keyboard button in the corner to bring it up while you scroll, or use Preview on any card. Type, swipe words, hold e or a for accents, drag the spacebar, and hold backspace.</p>
+    <div class="intro-actions">
+      <button class="btn primary" id="exportBtn" type="button">Export settings and notes</button>
+      <button class="btn" id="resetBtn" type="button">Reset to defaults</button>
+    </div>
+  </header>
+  <main id="settings"></main>
+</div>
+
+<div id="dock" hidden>
+  <div class="strip">
+    <div class="strip-label"><span>Test field</span><button type="button" id="clearField">Clear</button></div>
+    <div id="field" aria-label="Test text"></div>
+  </div>
+  <div id="sugg"><button type="button" data-i="0"></button><button type="button" class="mid" data-i="1"></button><button type="button" data-i="2"></button></div>
+  <div id="kb"></div>
+  <div id="popup" hidden></div>
+  <canvas id="fx"></canvas>
+</div>
+
+<div id="exportSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
+    <h2 id="exportTitle">Settings and notes</h2>
+    <textarea id="exportText" readonly></textarea>
+    <div class="card-foot">
+      <button class="btn primary" type="button" id="copyExport">Copy</button>
+      <button class="btn" type="button" id="closeExport">Close</button>
+      <span id="copyStatus" class="eyebrow"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ================================================================
+   Settings model
+   Values mirror the module's knobs, so an export can be dropped
+   straight into the next FUTO Tweaks build as defaults.
+   ================================================================ */
+const DEFAULTS = {
+  global: { accent: '#8AB4F8', kbTheme: 'dark', speed: 1, intensity: 1 },
+  pop: { on: true, grow: 6, pullback: 340, bounce: 0.35, strength: 1 },
+  float: { on: true, mode: 'ghost', rise: 42, duration: 640, grow: 1.6, wave: 8, waves: 1.5, strength: 1 },
+  heat: { on: true, swipe: true, build: 0.09, cool: 1100, threshold: 0.12, thickness: 18, strength: 1 },
+  wave: { on: true, radius: 1.8, speed: 0.35, strength: 0.8 },
+  enter: { on: true, duration: 380, width: 30, strength: 1 },
+  space: { on: true, mode: 'stars', count: 9, spread: 1, life: 760, strength: 1 },
+  del: { on: true, tap: 'fire', hold: 'blackhole', size: 34, swirl: 1, strength: 1 },
+  futoTrail: { on: true },
+  trace: { on: true, color: 'accent', custom: '#FF8A3D', duration: 620, strength: 1 },
+  comet: { on: false, length: 260, width: 7, hue: 60, strength: 1 },
+  ink: { on: false, color: 'accent', min: 1.5, max: 10, linger: 500, strength: 1 },
+  dust: { on: false, density: 1, life: 760, strength: 1 },
+  hop: { on: true, exit: 'burn', highlight: true, grow: 1.22, strength: 1 },
+  constellation: { on: false, star: 5, glow: 1, fold: 420, strength: 1 },
+  burst: { on: true, count: 18, strength: 1 },
+  ring: { on: true, style: 'liquid', timeout: 300, appear: 35, thickness: 3, wave: 3, strength: 1 },
+  popup: { style: 'bloom', radius: 70 },
+  trackpad: { on: true, dim: 0.6, labels: 0.85, grid: 0.35, halo: 26, strength: 1 },
+  show: { mode: 'bloom', duration: 320, stagger: 40, overshoot: 1.2 },
+  hide: { mode: 'dip', duration: 160 },
+};
+
+const STORE = 'futoTweaksLab.v1';
+const clone = (o) => JSON.parse(JSON.stringify(o));
+let cfg = clone(DEFAULTS);
+let notes = {};
+try {
+  const saved = JSON.parse(localStorage.getItem(STORE) || 'null');
+  if (saved && saved.cfg) {
+    for (const k in saved.cfg) if (cfg[k]) Object.assign(cfg[k], saved.cfg[k]);
+    notes = saved.notes || {};
+  }
+} catch (e) { /* storage blocked: start from defaults */ }
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify({ cfg, notes })); } catch (e) { /* not persisted */ }
+}
+
+/* Field builders for the settings cards */
+const R = (k, label, min, max, step, unit, show) => ({ type: 'range', k, label, min, max, step, unit, show });
+const C = (k, label, options, show) => ({ type: 'choice', k, label, options, show });
+const T = (k, label, show) => ({ type: 'toggle', k, label, show });
+const K = (k, label, show) => ({ type: 'color', k, label, show });
+const STR = R('strength', 'Intensity', 0, 1.5, 0.05, '×');
+
+const SECTIONS = [
+  { title: 'Typing', blurb: 'What a normal key tap does. Shift and capitals work here.', items: [
+    { id: 'pop', name: 'Key pop', desc: 'The key highlight swells past its edges, then pulls back.', demo: 'type', fields: [
+      R('grow', 'Swell', 0, 16, 0.5, 'dp'), R('pullback', 'Pullback time', 80, 1000, 10, 'ms'), R('bounce', 'Bounce', 0, 1, 0.05, ''), STR] },
+    { id: 'float', name: 'Letter float', desc: 'The typed letter lifts off its key. Ghost sends up a see-through copy of the key that sways as it rises.', demo: 'type', fields: [
+      C('mode', 'Style', [['rise', 'Rise'], ['grow', 'Grow'], ['ghost', 'Ghost key']]),
+      R('rise', 'Rise height', 0, 100, 1, 'dp'), R('duration', 'Duration', 200, 1500, 10, 'ms'),
+      R('grow', 'Growth', 1, 3, 0.05, '×'),
+      R('wave', 'Sway width', 0, 24, 0.5, 'dp', (c) => c.mode === 'ghost'),
+      R('waves', 'Sways', 0.5, 4, 0.25, '', (c) => c.mode === 'ghost'), STR] },
+    { id: 'heat', name: 'Heat streak', desc: 'A glow on the keyboard\'s top edge that warms toward orange as you type faster.', demo: 'heat', fields: [
+      T('swipe', 'Swipes build heat too'),
+      R('build', 'Build-up per key', 0.02, 0.25, 0.005, ''), R('cool', 'Cool-down', 200, 4000, 50, 'ms'),
+      R('threshold', 'Shows from', 0, 0.6, 0.01, ''), R('thickness', 'Glow height', 4, 40, 1, 'dp'), STR] },
+    { id: 'wave', name: 'Neighbor wave', tag: 'new', desc: 'Each press sends a ripple of light across the keys around it.', demo: 'type', fields: [
+      R('radius', 'Reach', 1, 4, 0.1, 'keys'), R('speed', 'Speed', 0.1, 1.2, 0.05, 'dp/ms'), STR] },
+  ] },
+  { title: 'Special keys', blurb: 'Enter, space and backspace get their own effects.', items: [
+    { id: 'enter', name: 'Enter sweep', desc: 'A band of light sweeps across the enter key\'s row.', demo: 'enter', fields: [
+      R('duration', 'Sweep time', 150, 900, 10, 'ms'), R('width', 'Band width', 10, 60, 1, '%'), STR] },
+    { id: 'space', name: 'Spacebar', tag: 'new', desc: 'Stars launch off the spacebar, or it puffs out a little cloud.', demo: 'space', fields: [
+      C('mode', 'Style', [['stars', 'Stars'], ['puff', 'Puff'], ['shimmer', 'Shimmer']]),
+      R('count', 'Amount', 3, 24, 1, '', (c) => c.mode !== 'shimmer'), R('spread', 'Spread', 0.3, 2, 0.05, '×'),
+      R('life', 'Lifetime', 300, 1600, 10, 'ms'), STR] },
+    { id: 'del', name: 'Backspace', tag: 'new', desc: 'Tap flares up or slices. Hold opens a black hole that swallows the letters you delete.', demo: 'del', fields: [
+      C('tap', 'Tap', [['fire', 'Fire'], ['slash', 'Slash'], ['crumble', 'Crumble'], ['none', 'None']]),
+      C('hold', 'Hold', [['blackhole', 'Black hole'], ['rumble', 'Rumble'], ['none', 'None']]),
+      R('size', 'Black hole size', 16, 60, 1, 'dp', (c) => c.hold === 'blackhole'),
+      R('swirl', 'Swirl speed', 0.2, 3, 0.05, '×', (c) => c.hold === 'blackhole'), STR] },
+  ] },
+  { title: 'Swipe trail', blurb: 'Drawn along your finger while swiping a word. Several can run at once.', items: [
+    { id: 'futoTrail', name: 'FUTO\'s own trail', desc: 'The thin line FUTO already draws. Turn it off to judge the others alone.', demo: 'swipe', fields: [] },
+    { id: 'trace', name: 'Key trace', desc: 'Keys light up as the swipe crosses them.', demo: 'swipe', fields: [
+      C('color', 'Color', [['accent', 'Accent'], ['rainbow', 'Rainbow'], ['custom', 'Custom']]),
+      K('custom', 'Custom color', (c) => c.color === 'custom'), R('duration', 'Fade time', 200, 1500, 10, 'ms'), STR] },
+    { id: 'comet', name: 'Comet', tag: 'new', desc: 'A bright head with a tapering tail that shifts hue along its length.', demo: 'swipe', fields: [
+      R('length', 'Tail length', 80, 800, 10, 'ms'), R('width', 'Head width', 2, 18, 0.5, 'dp'), R('hue', 'Hue shift', 0, 180, 1, '°'), STR] },
+    { id: 'ink', name: 'Ink brush', tag: 'new', desc: 'Thick when you slow down, thin when you move fast, like a calligraphy pen.', demo: 'swipe', fields: [
+      C('color', 'Ink', [['accent', 'Accent'], ['ink', 'Ink']]), R('min', 'Thinnest', 0.5, 6, 0.25, 'dp'),
+      R('max', 'Thickest', 3, 20, 0.5, 'dp'), R('linger', 'Linger', 100, 1500, 10, 'ms'), STR] },
+    { id: 'dust', name: 'Stardust', tag: 'new', desc: 'Sparkles shed from the trail and twinkle for a moment.', demo: 'swipe', fields: [
+      R('density', 'Density', 0.2, 3, 0.05, '×'), R('life', 'Lifetime', 200, 1600, 10, 'ms'), STR] },
+  ] },
+  { title: 'Swipe word', blurb: 'What happens to the letters and the word itself.', items: [
+    { id: 'hop', name: 'Letter hop', tag: 'v2', desc: 'Crossed letters collect on the number row instead of covering the suggestions. The predicted word lights up letter by letter, and on commit the letters burn up or fly into backspace.', demo: 'swipe', fields: [
+      C('exit', 'On commit', [['burn', 'Burn up'], ['fly', 'Fly to backspace'], ['form', 'Form the word']]),
+      T('highlight', 'Light up the predicted word'), R('grow', 'Predicted letter growth', 1, 1.6, 0.01, '×', (c) => c.highlight), STR] },
+    { id: 'constellation', name: 'Constellation', tag: 'new', desc: 'Crossed keys become stars joined by lines, then fold into the suggestion bar.', demo: 'swipe', fields: [
+      R('star', 'Star size', 2, 10, 0.5, 'dp'), R('glow', 'Line glow', 0, 2, 0.05, '×'), R('fold', 'Fold time', 150, 1000, 10, 'ms'), STR] },
+    { id: 'burst', name: 'Commit burst', desc: 'A small burst of confetti in the suggestion bar when the word lands.', demo: 'swipe', fields: [
+      R('count', 'Confetti', 4, 40, 1, ''), STR] },
+  ] },
+  { title: 'Long press and spacebar', blurb: 'Hold e, a, o, u, n, c, s, y or the period for accents. Drag the spacebar to move the cursor.', items: [
+    { id: 'ring', name: 'Hold charge', desc: 'Fills while you hold a key that has a long-press action.', demo: 'ring', fields: [
+      C('style', 'Style', [['liquid', 'Liquid fill'], ['ring', 'Ring']]),
+      R('timeout', 'Long-press delay', 150, 800, 10, 'ms'), R('appear', 'Appears after', 0, 80, 1, '%'),
+      R('thickness', 'Ring thickness', 1, 8, 0.5, 'dp', (c) => c.style === 'ring'),
+      R('wave', 'Liquid wave', 0, 8, 0.25, 'dp', (c) => c.style === 'liquid'), STR] },
+    { id: 'popup', name: 'Accent popup', tag: 'new', noToggle: true, desc: 'Bloom fans the accents out in an arc around the key instead of a row.', demo: 'ring', fields: [
+      C('style', 'Layout', [['bloom', 'Bloom arc'], ['row', 'Row']]), R('radius', 'Bloom radius', 40, 120, 1, 'dp', (c) => c.style === 'bloom')] },
+    { id: 'trackpad', name: 'Spacebar trackpad', tag: 'stronger', desc: 'While the spacebar moves the cursor, the keys fade back and a grid follows your finger.', demo: 'trackpad', fields: [
+      R('dim', 'Dim keys', 0, 0.9, 0.01, ''), R('labels', 'Fade labels', 0, 1, 0.01, ''), R('grid', 'Grid', 0, 1, 0.01, ''),
+      R('halo', 'Finger halo', 0, 60, 1, 'dp'), STR] },
+  ] },
+  { title: 'Keyboard show and hide', blurb: 'Plays when the keyboard appears and goes away.', items: [
+    { id: 'show', name: 'Show animation', tag: 'new', noToggle: true, desc: 'Center bloom pops the keys in from the middle outward. Row cascade raises the rows from the bottom.', demo: 'show', fields: [
+      C('mode', 'Style', [['bloom', 'Center bloom'], ['cascade', 'Row cascade'], ['none', 'None']]),
+      R('duration', 'Duration', 120, 900, 10, 'ms'), R('stagger', 'Stagger', 0, 120, 1, 'ms'), R('overshoot', 'Overshoot', 0, 3, 0.05, '×')] },
+    { id: 'hide', name: 'Hide animation', noToggle: true, desc: 'Android runs the real hide, so this can only be a quick moment before the slide.', demo: 'show', fields: [
+      C('mode', 'Style', [['dip', 'Dip'], ['none', 'None']]), R('duration', 'Duration', 80, 500, 10, 'ms')] },
+  ] },
+];
+
+/* ================================================================
+   Small helpers
+   ================================================================ */
+const $ = (s, r = document) => r.querySelector(s);
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const clamp01 = (v) => clamp(v, 0, 1);
+const lerp = (a, b, t) => a + (b - a) * t;
+// Inputs are clamped: an effect created mid-frame can see a slightly negative progress
+const easeOut = (t) => 1 - Math.pow(1 - clamp01(t), 3);
+const easeIn = (t) => Math.pow(clamp01(t), 3);
+const easeOutBack = (t, o = 1.70158) => { const u = clamp01(t) - 1; return 1 + (o + 1) * u * u * u + o * u * u; };
+const rand = (a, b) => a + Math.random() * (b - a);
+const now = () => performance.now();
+const D = (ms) => ms / cfg.global.speed;              // durations follow the global speed
+const S = (id) => cfg[id].strength * cfg.global.intensity; // per-effect intensity
+const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function hexToRgb(hex) {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgba(hex, a) { const [r, g, b] = hexToRgb(hex); return `rgba(${r},${g},${b},${clamp01(a)})`; }
+function hexHue(hex) {
+  let [r, g, b] = hexToRgb(hex).map((v) => v / 255);
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  if (!d) return 0;
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+}
+function darken(hex, f) { return '#' + hexToRgb(hex).map((v) => Math.round(v * f).toString(16).padStart(2, '0')).join(''); }
+const accent = () => cfg.global.accent;
+// Fire palette: yellow core, orange body, red tips fading out
+function fire(t, a) {
+  const stops = [[255, 230, 140], [255, 140, 50], [232, 56, 79], [80, 20, 40]];
+  const x = clamp01(t) * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(x)), f = x - i;
+  const c = stops[i].map((v, j) => Math.round(lerp(v, stops[i + 1][j], f)));
+  return `rgba(${c[0]},${c[1]},${c[2]},${clamp01(a)})`;
+}
+
+/* ================================================================
+   Settings UI
+   ================================================================ */
+const settingsEl = $('#settings');
+const fieldRefs = {}; // id -> [{def, el}]
+
+function fmt(v, f) {
+  const n = Number(v);
+  const s = f.step >= 1 ? String(Math.round(n)) : f.step >= 0.1 ? n.toFixed(1) : n.toFixed(2);
+  return f.unit ? `${s} ${f.unit}` : s;
+}
+
+function buildField(id, f) {
+  const c = cfg[id];
+  const wrap = document.createElement('div');
+  wrap.className = f.type === 'toggle' ? 'inline-toggle' : 'field';
+  const fid = `${id}-${f.k}`;
+  if (f.type === 'range') {
+    wrap.innerHTML = `<div class="field-top"><label class="flabel" for="${fid}">${f.label}</label><output id="${fid}-out"></output></div>
+      <input type="range" id="${fid}" min="${f.min}" max="${f.max}" step="${f.step}">`;
+    const input = wrap.querySelector('input'), out = wrap.querySelector('output');
+    input.value = c[f.k];
+    out.textContent = fmt(c[f.k], f);
+    input.addEventListener('input', () => { c[f.k] = Number(input.value); out.textContent = fmt(input.value, f); changed(id); });
+  } else if (f.type === 'choice') {
+    wrap.innerHTML = `<span class="flabel" id="${fid}-l">${f.label}</span><div class="seg" role="radiogroup" aria-labelledby="${fid}-l"></div>`;
+    const seg = wrap.querySelector('.seg');
+    f.options.forEach(([v, label]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.id = `${fid}-${v}`;
+      b.setAttribute('role', 'radio');
+      b.textContent = label;
+      b.setAttribute('aria-checked', String(c[f.k] === v));
+      b.addEventListener('click', () => {
+        c[f.k] = v;
+        seg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+        changed(id);
+      });
+      seg.appendChild(b);
+    });
+  } else if (f.type === 'toggle') {
+    wrap.innerHTML = `<label for="${fid}">${f.label}</label><label class="switch"><input type="checkbox" id="${fid}"><span></span></label>`;
+    const input = wrap.querySelector('input');
+    input.checked = !!c[f.k];
+    input.addEventListener('change', () => { c[f.k] = input.checked; changed(id); });
+  } else if (f.type === 'color') {
+    wrap.innerHTML = `<div class="field-top"><label class="flabel" for="${fid}">${f.label}</label><input type="color" id="${fid}"></div>`;
+    const input = wrap.querySelector('input');
+    input.value = c[f.k];
+    input.addEventListener('input', () => { c[f.k] = input.value; changed(id); });
+  }
+  return wrap;
+}
+
+function refreshVisibility(id) {
+  for (const { def, el } of fieldRefs[id] || []) el.hidden = def.show ? !def.show(cfg[id]) : false;
+  const card = $(`#card-${id}`);
+  if (card && 'on' in cfg[id]) card.classList.toggle('off', !cfg[id].on);
+}
+
+function changed(id) {
+  refreshVisibility(id);
+  if (id === 'global') applyGlobal();
+  if (id === 'hop') document.documentElement.style.setProperty('--lit-grow', cfg.hop.grow);
+  save();
+}
+
+function buildGlobalCard() {
+  const card = document.createElement('article');
+  card.className = 'card';
+  card.id = 'card-global';
+  const swatches = ['#8AB4F8', '#C58AF9', '#7FD8BE', '#F28B82', '#FDD663', '#FF9E5E'];
+  card.innerHTML = `<div class="card-head"><div><h3>Look and feel</h3><p>Applies to every effect. In the module the color comes from your Material You accent.</p></div></div>
+    <div class="fields">
+      <div class="field"><span class="flabel" id="acc-l">Accent color</span>
+        <div class="swatches" role="radiogroup" aria-labelledby="acc-l">${swatches.map((s, i) => `<button type="button" class="swatch" id="swatch-${i}" role="radio" aria-label="${s}" data-c="${s}" style="background:${s}"></button>`).join('')}
+        <input type="color" id="global-accent" aria-label="Custom accent"></div></div>
+    </div>`;
+  const fields = card.querySelector('.fields');
+  fieldRefs.global = [];
+  for (const f of [C('kbTheme', 'Keyboard theme', [['dark', 'Dark'], ['light', 'Light']]),
+    R('speed', 'Animation speed', 0.25, 2, 0.05, '×'), R('intensity', 'Overall intensity', 0, 1.5, 0.05, '×')]) {
+    const el = buildField('global', f);
+    fieldRefs.global.push({ def: f, el });
+    fields.appendChild(el);
+  }
+  const custom = card.querySelector('#global-accent');
+  custom.value = cfg.global.accent;
+  const markSwatch = () => card.querySelectorAll('.swatch').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.c.toLowerCase() === cfg.global.accent.toLowerCase())));
+  card.querySelectorAll('.swatch').forEach((b) => b.addEventListener('click', () => { cfg.global.accent = b.dataset.c; custom.value = b.dataset.c; markSwatch(); changed('global'); }));
+  custom.addEventListener('input', () => { cfg.global.accent = custom.value; markSwatch(); changed('global'); });
+  markSwatch();
+  return card;
+}
+
+function buildCard(item) {
+  const id = item.id, c = cfg[id];
+  const card = document.createElement('article');
+  card.className = 'card';
+  card.id = `card-${id}`;
+  const toggle = item.noToggle ? '' : `<label class="switch" title="On or off"><input type="checkbox" id="${id}-on" aria-label="${item.name} on"><span></span></label>`;
+  card.innerHTML = `<div class="card-head"><div><h3>${item.name}${item.tag ? `<span class="tag">${item.tag}</span>` : ''}</h3><p>${item.desc}</p></div>${toggle}</div><div class="fields"></div>
+    <div class="card-foot"><button type="button" class="btn small primary" id="${id}-preview">Preview</button>
+    <button type="button" class="btn small" id="${id}-notebtn" aria-expanded="false">Note</button></div>
+    <textarea class="note" id="${id}-note" placeholder="Feedback for this effect" hidden></textarea>`;
+  if (!item.noToggle) {
+    const on = card.querySelector(`#${id}-on`);
+    on.checked = !!c.on;
+    on.addEventListener('change', () => { c.on = on.checked; changed(id); });
+  }
+  const fields = card.querySelector('.fields');
+  fieldRefs[id] = [];
+  for (const f of item.fields) {
+    const el = buildField(id, f);
+    fieldRefs[id].push({ def: f, el });
+    fields.appendChild(el);
+  }
+  if (!item.fields.length) fields.remove();
+  card.querySelector(`#${id}-preview`).addEventListener('click', () => runDemo(item.demo, id));
+  const noteBtn = card.querySelector(`#${id}-notebtn`), note = card.querySelector(`#${id}-note`);
+  note.value = notes[id] || '';
+  const markNote = () => noteBtn.classList.toggle('has-note', !!note.value.trim());
+  noteBtn.addEventListener('click', () => {
+    note.hidden = !note.hidden;
+    noteBtn.setAttribute('aria-expanded', String(!note.hidden));
+    if (!note.hidden) note.focus();
+  });
+  note.addEventListener('input', () => { notes[id] = note.value; markNote(); save(); });
+  if (note.value) { note.hidden = false; noteBtn.setAttribute('aria-expanded', 'true'); }
+  markNote();
+  return card;
+}
+
+function buildSettings() {
+  settingsEl.innerHTML = '';
+  fieldRefs.global = [];
+  const g = document.createElement('section');
+  g.className = 'section';
+  g.innerHTML = '<div class="cards"></div>';
+  g.firstChild.appendChild(buildGlobalCard());
+  settingsEl.appendChild(g);
+  for (const sec of SECTIONS) {
+    const s = document.createElement('section');
+    s.className = 'section';
+    s.innerHTML = `<h2>${sec.title}</h2><p>${sec.blurb}</p><div class="cards"></div>`;
+    const cards = s.querySelector('.cards');
+    for (const item of sec.items) cards.appendChild(buildCard(item));
+    settingsEl.appendChild(s);
+  }
+  for (const id in cfg) refreshVisibility(id);
+}
+
+function applyGlobal() {
+  const root = document.documentElement.style;
+  root.setProperty('--accent', cfg.global.accent);
+  // Dark text on the accent, and a darker accent for text on light surfaces (the CSS picks per theme)
+  root.setProperty('--on-accent', darken(cfg.global.accent, 0.22));
+  root.setProperty('--accent-dark', darken(cfg.global.accent, 0.55));
+  dock.classList.toggle('kb-light', cfg.global.kbTheme === 'light');
+  document.documentElement.style.setProperty('--lit-grow', cfg.hop.grow);
+}
+
+/* ================================================================
+   Mock keyboard
+   ================================================================ */
+const dock = $('#dock'), kb = $('#kb'), fieldEl = $('#field'), suggEl = $('#sugg'), popupEl = $('#popup');
+const canvas = $('#fx'), ctx = canvas.getContext('2d');
+const ACCENTS = { a: 'àáâäæãåā', e: 'èéêëē', i: 'ìíîïī', o: 'òóôöõøō', u: 'ùúûüū', n: 'ñń', c: 'çć', s: 'ßś', y: 'ÿý', '.': '!?:;…', ',': ';\'"' };
+const ROWS = [
+  { cls: 'numrow', keys: '1234567890'.split('').map((c) => ({ t: 'num', c })) },
+  { keys: 'qwertyuiop'.split('').map((c) => ({ t: 'char', c })) },
+  { cls: 'inset', keys: 'asdfghjkl'.split('').map((c) => ({ t: 'char', c })) },
+  { keys: [{ t: 'shift', w: 1.5, label: '⇧' }, ...'zxcvbnm'.split('').map((c) => ({ t: 'char', c })), { t: 'del', w: 1.5, label: '⌫' }] },
+  { keys: [{ t: 'sym', w: 1.5, label: '?123' }, { t: 'char', c: ',' }, { t: 'space', w: 5, label: 'English' }, { t: 'char', c: '.' }, { t: 'enter', w: 1.5, label: '⏎' }] },
+];
+let KEYS = [], ROW_EL = [], KB = { x: 0, y: 0, w: 0, h: 0 }, SUGG = { x: 0, y: 0, w: 0, h: 0 };
+let DW = 0, DH = 0, DPR = 1;
+
+function buildKeyboard() {
+  kb.innerHTML = '';
+  KEYS = [];
+  ROW_EL = [];
+  ROWS.forEach((row, ri) => {
+    const re = document.createElement('div');
+    re.className = 'row' + (row.cls ? ' ' + row.cls : '');
+    row.keys.forEach((d) => {
+      const el = document.createElement('div');
+      el.className = 'key' + (['shift', 'del', 'enter', 'sym'].includes(d.t) ? ' mod' : '') + (d.t === 'space' ? ' space' : '') + (d.t === 'shift' ? ' shift' : '');
+      el.style.flexGrow = d.w || 1;
+      const lab = document.createElement('span');
+      lab.className = 'lab';
+      lab.textContent = d.label || d.c;
+      el.appendChild(lab);
+      re.appendChild(el);
+      KEYS.push({ ...d, el, lab, row: ri, r: { x: 0, y: 0, w: 0, h: 0 }, cx: 0, cy: 0 });
+    });
+    kb.appendChild(re);
+    ROW_EL.push(re);
+  });
+}
+const keyOf = (pred) => KEYS.find(pred);
+const charKey = (ch) => KEYS.find((k) => (k.t === 'char' || k.t === 'num') && k.c === ch.toLowerCase());
+const isLetter = (k) => k && k.t === 'char' && /[a-z]/.test(k.c);
+
+/** Key rectangles in dock coordinates. Measured while nothing is transformed. */
+function measure() {
+  const dr = dock.getBoundingClientRect();
+  DW = dr.width;
+  DH = dr.height;
+  for (const k of KEYS) {
+    const r = k.el.getBoundingClientRect();
+    k.r = { x: r.left - dr.left, y: r.top - dr.top, w: r.width, h: r.height };
+    k.cx = k.r.x + k.r.w / 2;
+    k.cy = k.r.y + k.r.h / 2;
+  }
+  const kr = kb.getBoundingClientRect(), sr = suggEl.getBoundingClientRect();
+  KB = { x: kr.left - dr.left, y: kr.top - dr.top, w: kr.width, h: kr.height };
+  SUGG = { x: sr.left - dr.left, y: sr.top - dr.top, w: sr.width, h: sr.height };
+  DPR = window.devicePixelRatio || 1;
+  canvas.width = Math.round(DW * DPR);
+  canvas.height = Math.round(DH * DPR);
+  canvas.style.width = DW + 'px';
+  canvas.style.height = DH + 'px';
+  document.documentElement.style.setProperty('--dock-h', DH + 'px');
+}
+
+function hit(x, y) {
+  let best = null, bd = Infinity;
+  for (const k of KEYS) {
+    const r = k.r;
+    const dx = Math.max(r.x - x, 0, x - (r.x + r.w)), dy = Math.max(r.y - y, 0, y - (r.y + r.h));
+    const d = dx * dx + dy * dy;
+    if (d < bd) { bd = d; best = k; }
+  }
+  return bd <= 18 * 18 ? best : null;
+}
+
+/* ---------- Text field ---------- */
+let text = 'Hey Theo, try swiping a word\nor drag the spacebar up and down.\n', caret = text.length;
+let shift = 0; // 0 off, 1 once, 2 locked
+let lastCommit = null;
+
+function renderField() {
+  fieldEl.innerHTML = esc(text.slice(0, caret)) + '<span id="caret"></span>' + esc(text.slice(caret));
+  const c = $('#caret');
+  const fr = fieldEl.getBoundingClientRect(), cr = c.getBoundingClientRect();
+  if (cr.bottom > fr.bottom - 4) fieldEl.scrollTop += cr.bottom - fr.bottom + 8;
+  if (cr.top < fr.top + 4) fieldEl.scrollTop -= fr.top - cr.top + 8;
+  updateShiftUI();
+}
+function autoCap() { const b = text.slice(0, caret); return b.length === 0 || /([.!?]\s+|\n)$/.test(b); }
+function shifted() { return shift > 0 || autoCap(); }
+function updateShiftUI() {
+  const up = shifted();
+  for (const k of KEYS) if (k.t === 'char' && /[a-z]/.test(k.c)) k.lab.textContent = up ? k.c.toUpperCase() : k.c;
+  dock.classList.toggle('shift-on', shift === 1 || (shift === 0 && autoCap()));
+  dock.classList.toggle('shift-lock', shift === 2);
+}
+function insertText(s) {
+  text = text.slice(0, caret) + s + text.slice(caret);
+  caret += s.length;
+  if (shift === 1) shift = 0;
+  renderField();
+}
+function deleteChar() {
+  if (caret === 0) return null;
+  const ch = text[caret - 1];
+  text = text.slice(0, caret - 1) + text.slice(caret);
+  caret--;
+  renderField();
+  return ch;
+}
+function moveCaret(n) { caret = clamp(caret + n, 0, text.length); renderField(); }
+function moveLine(dir) {
+  const lines = text.split('\n');
+  let acc = 0, line = 0, col = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (caret <= acc + lines[i].length) { line = i; col = caret - acc; break; }
+    acc += lines[i].length + 1;
+  }
+  const nl = line + dir;
+  if (nl < 0 || nl >= lines.length) return;
+  let start = 0;
+  for (let i = 0; i < nl; i++) start += lines[i].length + 1;
+  caret = start + Math.min(col, lines[nl].length);
+  renderField();
+}
+function caretPoint() {
+  const c = $('#caret'), dr = dock.getBoundingClientRect();
+  if (!c) return { x: DW / 2, y: 40 };
+  const r = c.getBoundingClientRect();
+  return { x: r.left - dr.left, y: r.top - dr.top + r.height / 2 };
+}
+$('#clearField').addEventListener('click', () => { text = ''; caret = 0; renderField(); setSuggestions(['', '', '']); });
+
+/* ---------- Mini swipe decoder and suggestions ---------- */
+const DICT = ('the of and to in is you that it he was for on are as with his they at be this have from or one had by word but not what all were we when your can said there use an each which she do how their if will up other about out many then them these so some her would make like him into time has look two more write go see number no way could people my than first water been call who its now find long down day did get come made may part hello world keyboard theo swipe typing effect effects futo pixel phone great thanks thank good morning night love test testing quick brown fox jumps over lazy dog yes okay sure later today tomorrow tonight here where why because really very just know think want need going still back over home work game games play design designer laser maker space star stars wave ghost fire black hole letter letters magic animation smooth feel nice cool awesome perfect almost little big small sweep shimmer comet stardust trace ring bloom cascade jump hop').split(' ');
+const collapse = (w) => w.replace(/(.)\1+/g, '$1');
+function subseqCount(word, seq) { // how many leading letters of word appear in order in seq
+  let j = 0, n = 0;
+  for (const ch of word) {
+    const at = seq.indexOf(ch, j);
+    if (at < 0) break;
+    j = at + 1;
+    n++;
+  }
+  return n;
+}
+/**
+ * Tiny stand-in for FUTO Swipe: a word fits if its letters appear in order among the crossed
+ * keys. When the swipe ends, the keys where the finger turned sharply (corners) must also be
+ * in the word, which is what separates "world" from "would".
+ */
+function decode(seq, final, corners = '') {
+  if (!seq) return [];
+  if (final && corners) {
+    const strict = decodeWith(seq, true, corners);
+    if (strict.length) return strict;
+  }
+  return decodeWith(seq, final, '');
+}
+function decodeWith(seq, final, corners) {
+  const first = seq[0], last = seq[seq.length - 1], out = [];
+  DICT.forEach((w, i) => {
+    if (w[0] !== first) return;
+    const cw = collapse(w);
+    if (final && cw[cw.length - 1] !== last) return;
+    const m = subseqCount(cw, seq);
+    if (final && m < cw.length) return;
+    if (corners && subseqCount(corners, cw) < corners.length) return;
+    // Live: favour words whose letters we have covered so far; final: favour longer fits, then common words
+    const score = final ? cw.length * 2 - i * 0.01 : m * 2 - (cw.length - m) * 0.6 - i * 0.01;
+    out.push([score, w]);
+  });
+  out.sort((a, b) => b[0] - a[0]);
+  const words = out.slice(0, 3).map((x) => x[1]);
+  if (final && !words.length && !corners) words.push(collapse(seq.length > 2 ? seq[0] + seq.slice(1, -1).replace(/[^aeiou]/g, '') + seq[seq.length - 1] : seq));
+  return words;
+}
+function currentWordPrefix() { const m = text.slice(0, caret).match(/[A-Za-z']+$/); return m ? m[0] : ''; }
+function setSuggestions(list, litCount = 0) {
+  // FUTO order: best guess in the middle
+  const order = [list[1] || '', list[0] || '', list[2] || ''];
+  suggEl.querySelectorAll('button').forEach((b, i) => {
+    const w = order[i];
+    b.dataset.word = w;
+    if (i === 1 && litCount > 0 && cfg.hop.on && cfg.hop.highlight) {
+      let n = 0;
+      b.innerHTML = [...w].map((ch) => {
+        const lit = n < litCount && /[a-z]/i.test(ch);
+        if (/[a-z]/i.test(ch)) n++;
+        return `<span class="ch${lit ? ' lit' : ''}">${esc(ch)}</span>`;
+      }).join('');
+    } else {
+      b.textContent = w;
+    }
+  });
+}
+function typingSuggestions() {
+  const p = currentWordPrefix().toLowerCase();
+  if (!p) { setSuggestions(['the', 'I', 'and']); return; }
+  const list = DICT.filter((w) => w.startsWith(p) && w !== p).slice(0, 2);
+  setSuggestions([p, ...list]);
+}
+suggEl.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b || !b.dataset.word) return;
+  const w = b.dataset.word;
+  if (lastCommit && caret === lastCommit.end) {
+    text = text.slice(0, lastCommit.start) + w + ' ' + text.slice(lastCommit.end);
+    caret = lastCommit.start + w.length + 1;
+    lastCommit = { start: lastCommit.start, end: caret };
+  } else {
+    const p = currentWordPrefix();
+    text = text.slice(0, caret - p.length) + w + ' ' + text.slice(caret);
+    caret += w.length + 1 - p.length;
+  }
+  renderField();
+  typingSuggestions();
+});
+
+/* ================================================================
+   Effects engine: one canvas over the whole dock, one frame loop
+   ================================================================ */
+const FX = [];
+let raf = 0;
+function kick() { if (!raf) raf = requestAnimationFrame(frame); }
+function addFx(draw) { if (FX.length < 500) { FX.push(draw); kick(); } }
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) { ctx.roundRect(x, y, w, h, r); return; }
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function starPath(cx, cy, r, points, inner, rot) {
+  ctx.beginPath();
+  for (let i = 0; i < points * 2; i++) {
+    const a = rot + (i * Math.PI) / points - Math.PI / 2, rr = i % 2 ? r * inner : r;
+    ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+  }
+  ctx.closePath();
+}
+function glowText(str, x, y, size, scale, alpha, color = accent(), rot = 0) {
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.scale(scale, scale);
+  ctx.font = `500 ${size}px Roboto, system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = rgba(color, 0.8 * alpha);
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = rgba(color, alpha);
+  ctx.fillText(str, 0, 1);
+  ctx.restore();
+}
+
+function frame() {
+  raf = 0;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, DW, DH);
+  const t = now();
+  let alive = false;
+  if (trackpad.draw(t)) alive = true;
+  for (let i = 0; i < FX.length; i++) {
+    if (FX[i](t)) alive = true;
+    else { FX.splice(i, 1); i--; }
+  }
+  if (trail.draw(t)) alive = true;
+  if (heat.draw(t)) alive = true;
+  if (alive) kick();
+}
+
+/* ---------- Typing effects ---------- */
+function fxPop(k) {
+  const c = cfg.pop, t0 = now(), grow = D(70), pull = D(c.pullback), s = S('pop');
+  addFx((t) => {
+    const e = t - t0;
+    let sw;
+    if (e < grow) sw = c.grow * easeOut(e / grow);
+    else {
+      const u = (e - grow) / pull;
+      if (u >= 1) return false;
+      // Pull back with an adjustable spring: no bounce eases straight in, full bounce wobbles
+      sw = c.grow * (1 - u) * Math.cos(u * Math.PI * (0.5 + 2.5 * c.bounce));
+    }
+    const fade = 1 - e / (grow + pull);
+    roundRect(k.r.x - sw, k.r.y - sw, k.r.w + sw * 2, k.r.h + sw * 2, 10);
+    ctx.fillStyle = rgba(accent(), 0.2 * s * fade);
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = rgba(accent(), 0.7 * s * fade);
+    ctx.stroke();
+    return true;
+  });
+}
+
+function fxFloat(k, glyph) {
+  const c = cfg.float, t0 = now(), dur = D(c.duration), s = S('float');
+  const size = k.r.h * 0.48, mode = c.mode;
+  addFx((t) => {
+    const p = (t - t0) / dur;
+    if (p >= 1) return false;
+    const ep = easeOut(p);
+    if (mode === 'rise') {
+      glowText(glyph, k.cx, k.cy - c.rise * ep, size, 1 + (c.grow - 1) * 0.4 * ep, (1 - p) * s);
+    } else if (mode === 'grow') {
+      glowText(glyph, k.cx, k.cy - c.rise * 0.35 * ep, size, 1 + (c.grow - 1) * ep, Math.pow(1 - p, 1.2) * s);
+    } else {
+      // Ghost: a see-through copy of the key that sways as it drifts up
+      const sway = Math.sin(p * Math.PI * 2 * c.waves) * c.wave * (1 - p * 0.4);
+      const x = k.cx + sway, y = k.cy - c.rise * ep, sc = 1 + (c.grow - 1) * 0.35 * ep;
+      const a = (1 - p) * 0.85 * s;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(sway * 0.012);
+      ctx.scale(sc, sc);
+      roundRect(-k.r.w / 2, -k.r.h / 2, k.r.w, k.r.h, 9);
+      ctx.fillStyle = rgba(accent(), 0.14 * a);
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = rgba(accent(), 0.55 * a);
+      ctx.stroke();
+      ctx.restore();
+      glowText(glyph, x, y, size, sc, a, accent(), sway * 0.012);
+    }
+    return true;
+  });
+}
+
+const heat = {
+  level: 0, last: 0, shaderColor: '',
+  add(amount) { this.decay(now()); this.level = Math.min(1, this.level + amount); kick(); },
+  decay(t) { if (this.last) this.level *= Math.exp(-(t - this.last) / D(cfg.heat.cool)); this.last = t; },
+  draw(t) {
+    this.decay(t);
+    if (this.level < 0.012 || !cfg.heat.on) { this.level = this.level < 0.012 ? 0 : this.level; return this.level > 0; }
+    const c = cfg.heat, vis = clamp01((this.level - c.threshold) / 0.5) * S('heat');
+    if (vis > 0) {
+      const L = this.level;
+      const col = L < 0.5 ? mix(accent(), '#FF8A3D', L / 0.5) : mix('#FF8A3D', '#FF3B5C', (L - 0.5) / 0.5);
+      const g = ctx.createLinearGradient(0, KB.y, 0, KB.y + c.thickness);
+      g.addColorStop(0, rgba(col, 0.6 * vis));
+      g.addColorStop(1, rgba(col, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, KB.y, DW, c.thickness);
+      ctx.fillStyle = rgba(col, 0.95 * vis);
+      ctx.fillRect(0, KB.y, DW, 2);
+    }
+    return true;
+  },
+};
+function mix(a, b, t) {
+  const A = hexToRgb(a), B = hexToRgb(b);
+  return '#' + A.map((v, i) => Math.round(lerp(v, B[i], clamp01(t))).toString(16).padStart(2, '0')).join('');
+}
+
+function fxWave(k) {
+  const c = cfg.wave, t0 = now(), reach = c.radius * k.r.w, s = S('wave');
+  const list = KEYS.filter((n) => n !== k && n.row > 0).map((n) => ({ n, d: Math.hypot(n.cx - k.cx, (n.cy - k.cy) * 0.9) })).filter((o) => o.d <= reach);
+  addFx((t) => {
+    let alive = false;
+    for (const { n, d } of list) {
+      const start = t0 + D(d / c.speed), u = (t - start) / D(320);
+      if (u < 0) { alive = true; continue; }
+      if (u >= 1) continue;
+      alive = true;
+      const a = Math.pow(1 - d / reach, 1.2) * Math.pow(1 - u, 2) * s;
+      roundRect(n.r.x, n.r.y, n.r.w, n.r.h, 9);
+      ctx.fillStyle = rgba(accent(), 0.32 * a);
+      ctx.fill();
+    }
+    return alive;
+  });
+}
+
+/* ---------- Special keys ---------- */
+function band(x, y, w, h, alpha) {
+  const g = ctx.createLinearGradient(x, 0, x + w, 0);
+  g.addColorStop(0, rgba(accent(), 0));
+  g.addColorStop(0.5, rgba(accent(), alpha));
+  g.addColorStop(1, rgba(accent(), 0));
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y, w, h);
+}
+function fxEnter(k) {
+  const c = cfg.enter, t0 = now(), dur = D(c.duration), bw = Math.max(50, DW * c.width / 100), s = S('enter');
+  addFx((t) => {
+    const p = (t - t0) / dur;
+    if (p >= 1) return false;
+    const cx = lerp(KB.x + KB.w + bw / 2, KB.x - bw / 2, easeOut(p));
+    band(cx - bw / 2, k.r.y, bw, k.r.h, 0.5 * Math.sin(Math.PI * p) * s);
+    return true;
+  });
+}
+function fxSpace(k, tapX) {
+  const c = cfg.space, t0 = now(), life = D(c.life), s = S('space');
+  if (c.mode === 'shimmer') {
+    const bw = Math.max(36, k.r.w * 0.22);
+    addFx((t) => {
+      const p = (t - t0) / D(320);
+      if (p >= 1) return false;
+      ctx.save();
+      roundRect(k.r.x, k.r.y, k.r.w, k.r.h, 9);
+      ctx.clip();
+      band(lerp(k.r.x - bw, k.r.x + k.r.w, easeOut(p)), k.r.y, bw, k.r.h, 0.6 * (1 - p * p) * s);
+      ctx.restore();
+      return true;
+    });
+    return;
+  }
+  const n = Math.round(c.count), x0 = tapX ?? k.cx;
+  const parts = Array.from({ length: n }, () => ({
+    x: x0 + rand(-k.r.w * 0.25, k.r.w * 0.25) * c.spread * 0.6,
+    y: k.r.y + k.r.h * 0.4,
+    vx: rand(-70, 70) * c.spread,
+    vy: c.mode === 'stars' ? -rand(90, 200) : -rand(15, 45),
+    r: c.mode === 'stars' ? rand(3, 7) : rand(7, 13),
+    rot: rand(0, Math.PI), spin: rand(-4, 4), tw: rand(0, 6),
+    hue: Math.random() < 0.35,
+  }));
+  addFx((t) => {
+    const e = (t - t0) / 1000, p = (t - t0) / life;
+    if (p >= 1) return false;
+    for (const q of parts) {
+      if (c.mode === 'stars') {
+        const x = q.x + q.vx * e, y = q.y + q.vy * e + 140 * e * e;
+        const tw = 0.6 + 0.4 * Math.sin(q.tw + e * 18);
+        starPath(x, y, q.r * (1 - p * 0.4), 5, 0.45, q.rot + q.spin * e);
+        ctx.fillStyle = q.hue ? `rgba(255,248,220,${(1 - p) * tw * s})` : rgba(accent(), (1 - p) * tw * s);
+        ctx.shadowColor = rgba(accent(), 0.8 * (1 - p) * s);
+        ctx.shadowBlur = 8;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      } else {
+        // Puff: soft rounded clouds that swell and drift up
+        const x = q.x + q.vx * e * 0.5, y = q.y + q.vy * e, r = q.r * (1 + 1.8 * easeOut(p));
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, rgba(accent(), 0.45 * (1 - p) * s));
+        g.addColorStop(1, rgba(accent(), 0));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    return true;
+  });
+}
+
+function fxDelTap(k) {
+  const c = cfg.del, t0 = now(), s = S('del');
+  if (c.tap === 'fire') {
+    const parts = Array.from({ length: 22 }, () => ({ x: rand(k.r.x + 6, k.r.x + k.r.w - 6), y: k.r.y + k.r.h - rand(2, 10), vy: -rand(50, 130), ph: rand(0, 6), r: rand(3, 7), d: rand(0, 120) }));
+    addFx((t) => {
+      let alive = false;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const q of parts) {
+        const e = t - t0 - q.d, p = e / D(620);
+        if (p < 0) { alive = true; continue; }
+        if (p >= 1) continue;
+        alive = true;
+        const sec = e / 1000;
+        const x = q.x + Math.sin(q.ph + sec * 14) * 4 * p, y = q.y + q.vy * sec;
+        ctx.fillStyle = fire(p, (1 - p) * 0.9 * s);
+        ctx.beginPath();
+        ctx.arc(x, y, q.r * (1 - p * 0.7), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      return alive;
+    });
+  } else if (c.tap === 'slash') {
+    const sparks = Array.from({ length: 12 }, () => ({ a: rand(-0.6, 0.6) - 0.7, v: rand(80, 220) }));
+    addFx((t) => {
+      const e = t - t0, p = e / D(420);
+      if (p >= 1) return false;
+      const draw = clamp01(e / D(70));
+      const x1 = k.r.x + 4, y1 = k.r.y + k.r.h - 4, x2 = k.r.x + k.r.w - 4, y2 = k.r.y + 4;
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.shadowColor = rgba(accent(), (1 - p) * s);
+      ctx.shadowBlur = 12;
+      ctx.strokeStyle = `rgba(255,255,255,${(1 - p) * s})`;
+      ctx.lineWidth = 2.5 * (1 - p * 0.6);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(lerp(x1, x2, draw), lerp(y1, y2, draw));
+      ctx.stroke();
+      ctx.restore();
+      if (draw >= 1) {
+        const sec = (e - D(70)) / 1000;
+        ctx.fillStyle = rgba(accent(), (1 - p) * s);
+        for (const q of sparks) {
+          ctx.beginPath();
+          ctx.arc(x2 + Math.cos(q.a) * q.v * sec, y2 + Math.sin(q.a) * q.v * sec + 200 * sec * sec, 1.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      return true;
+    });
+    k.el.animate([{ transform: 'translate(-2px,1px)' }, { transform: 'translate(2px,-1px)' }, { transform: 'none' }], { duration: 160 });
+  } else if (c.tap === 'crumble') {
+    const parts = Array.from({ length: 10 }, () => ({ x: rand(k.r.x, k.r.x + k.r.w), y: rand(k.r.y, k.r.y + k.r.h), vx: rand(-60, 60), vy: rand(-60, 30), rot: rand(0, 6), spin: rand(-8, 8), sz: rand(2.5, 5) }));
+    addFx((t) => {
+      const e = (t - t0) / 1000, p = (t - t0) / D(520);
+      if (p >= 1) return false;
+      ctx.fillStyle = rgba(accent(), (1 - p * p) * s);
+      for (const q of parts) {
+        ctx.save();
+        ctx.translate(q.x + q.vx * e, q.y + q.vy * e + 450 * e * e);
+        ctx.rotate(q.rot + q.spin * e);
+        ctx.fillRect(-q.sz / 2, -q.sz / 2, q.sz, q.sz);
+        ctx.restore();
+      }
+      return true;
+    });
+  }
+}
+
+/** Backspace hold: a black hole that grows and swallows deleted letters, or a rumble. */
+let hole = null;
+function startHoldDelete(k) {
+  const c = cfg.del;
+  if (!c.on || c.hold === 'none') { hole = { k, start: now(), end: 0, mode: 'none', parts: [] }; return; }
+  hole = { k, start: now(), end: 0, mode: c.hold, parts: [] };
+  const h = hole;
+  addFx((t) => {
+    if (hole !== h && !h.end) h.end = t;
+    const held = (h.end || t) - h.start, s = S('del');
+    if (h.mode === 'rumble') {
+      if (h.end) { k.el.style.transform = ''; return false; }
+      const amp = Math.min(3.5, held / 350);
+      k.el.style.transform = `translate(${rand(-amp, amp)}px, ${rand(-amp, amp) * 0.6}px)`;
+      const g = Math.min(1, held / 1200);
+      roundRect(k.r.x - 3, k.r.y - 3, k.r.w + 6, k.r.h + 6, 11);
+      ctx.strokeStyle = fire(1 - g, 0.8 * g * s);
+      ctx.lineWidth = 2 + 3 * g;
+      ctx.stroke();
+      return true;
+    }
+    const collapse = h.end ? clamp01((t - h.end) / D(260)) : 0;
+    if (collapse >= 1 && !h.parts.length) return false;
+    const r = lerp(7, c.size, clamp01(held / 1400)) * (1 - easeIn(collapse));
+    const x = k.cx, y = k.cy, spin = (t / 1000) * 3 * c.swirl;
+    if (r > 0.5) {
+      // Accretion disk: tilted rings rotating around the core
+      ctx.save();
+      ctx.translate(x, y);
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r * (1.25 + i * 0.22), r * (0.42 + i * 0.07), spin * (1 - i * 0.2) + i, 0, Math.PI * 2);
+        ctx.strokeStyle = rgba(i === 1 ? '#FF9E5E' : accent(), (0.55 - i * 0.12) * s);
+        ctx.lineWidth = 2 - i * 0.4;
+        ctx.stroke();
+      }
+      const g = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r);
+      g.addColorStop(0, 'rgba(0,0,0,1)');
+      g.addColorStop(0.75, 'rgba(0,0,0,0.95)');
+      g.addColorStop(0.92, rgba(accent(), 0.85 * s));
+      g.addColorStop(1, rgba(accent(), 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    // Swallowed letters spiral in
+    for (let i = 0; i < h.parts.length; i++) {
+      const q = h.parts[i], u = (t - q.t0) / D(520);
+      if (u >= 1) { h.parts.splice(i, 1); i--; continue; }
+      const dist = q.d0 * Math.pow(1 - u, 1.4), ang = q.a0 + u * Math.PI * 3 * c.swirl;
+      glowText(q.g, x + Math.cos(ang) * dist, y + Math.sin(ang) * dist, 18, 1 - u * 0.85, (1 - u * 0.6) * s, accent(), ang);
+    }
+    if (h.end && collapse >= 1) return h.parts.length > 0;
+    return true;
+  });
+}
+function swallow(ch) {
+  if (!hole || hole.mode !== 'blackhole' || !ch || ch === '\n') return;
+  const p = caretPoint(), dx = p.x - hole.k.cx, dy = p.y - hole.k.cy;
+  hole.parts.push({ g: ch === ' ' ? '·' : ch, t0: now(), d0: Math.hypot(dx, dy), a0: Math.atan2(dy, dx) });
+}
+
+/* ---------- Swipe trail system ---------- */
+const trail = {
+  pts: [], dust: [], active: false, endAt: 0,
+  start(x, y) { this.pts = [{ x, y, t: now(), v: 0 }]; this.active = true; this.endAt = 0; kick(); },
+  add(x, y) {
+    const t = now(), l = this.pts[this.pts.length - 1];
+    const v = l ? Math.hypot(x - l.x, y - l.y) / Math.max(1, t - l.t) : 0;
+    this.pts.push({ x, y, t, v });
+    if (cfg.dust.on && l) {
+      const n = Math.hypot(x - l.x, y - l.y) / 7 * cfg.dust.density;
+      for (let i = 0; i < n; i++) this.dust.push({ x: lerp(l.x, x, Math.random()) + rand(-6, 6), y: lerp(l.y, y, Math.random()) + rand(-6, 6), t, r: rand(1, 2.6), ph: rand(0, 6), vy: rand(-12, 4) });
+    }
+    kick();
+  },
+  end() { this.active = false; this.endAt = now(); },
+  draw(t) {
+    let alive = this.active;
+    const pts = this.pts;
+    // FUTO's own thin trail
+    if (cfg.futoTrail.on) alive = this.line(pts, t, D(220), () => 3, () => accent(), 0.9) || alive;
+    if (cfg.comet.on) {
+      const c = cfg.comet, base = hexHue(accent()), s = S('comet');
+      alive = this.line(pts, t, D(c.length), (f) => c.width * f, (f) => `hsla(${(base + c.hue * (1 - f)) % 360},90%,68%,1)`, s, true) || alive;
+    }
+    if (cfg.ink.on) {
+      const c = cfg.ink, s = S('ink');
+      const fade = this.active ? 1 : 1 - clamp01((t - this.endAt) / D(c.linger));
+      if (fade > 0 && pts.length > 1) {
+        alive = true;
+        ctx.lineCap = 'round';
+        const col = c.color === 'ink' ? (cfg.global.kbTheme === 'light' ? '#14161B' : '#F2F4F8') : accent();
+        for (let i = 1; i < pts.length; i++) {
+          const w = clamp(c.max - pts[i].v * (c.max - c.min) / 1.6, c.min, c.max);
+          ctx.strokeStyle = rgba(col, 0.85 * fade * s);
+          ctx.lineWidth = w;
+          ctx.beginPath();
+          ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
+          ctx.lineTo(pts[i].x, pts[i].y);
+          ctx.stroke();
+        }
+      }
+    }
+    if (this.dust.length) {
+      const life = D(cfg.dust.life), s = S('dust');
+      for (let i = 0; i < this.dust.length; i++) {
+        const q = this.dust[i], p = (t - q.t) / life;
+        if (p >= 1) { this.dust.splice(i, 1); i--; continue; }
+        const tw = 0.5 + 0.5 * Math.sin(q.ph + (t - q.t) / 60);
+        ctx.fillStyle = Math.random() < 0.2 ? `rgba(255,255,255,${(1 - p) * tw * s})` : rgba(accent(), (1 - p) * tw * s);
+        starPath(q.x, q.y + q.vy * (t - q.t) / 1000, q.r * 1.6, 4, 0.35, q.ph);
+        ctx.fill();
+      }
+      alive = true;
+    }
+    if (!alive && !this.active) this.pts = [];
+    return alive;
+  },
+  /** Draws the recent part of the path, each segment fading by age. width(f) and color(f) take 1 at the head, 0 at the tail. */
+  line(pts, t, window, width, color, alpha, glow) {
+    if (pts.length < 2) return false;
+    let any = false;
+    ctx.lineCap = 'round';
+    if (glow) { ctx.shadowBlur = 10; }
+    for (let i = 1; i < pts.length; i++) {
+      const age = t - pts[i].t;
+      if (age > window) continue;
+      const f = 1 - age / window;
+      any = true;
+      const col = color(f);
+      ctx.strokeStyle = col.startsWith('#') ? rgba(col, f * alpha) : col.replace(',1)', `,${f * alpha})`);
+      if (glow) ctx.shadowColor = ctx.strokeStyle;
+      ctx.lineWidth = Math.max(0.5, width(f));
+      ctx.beginPath();
+      ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
+      ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    return any;
+  },
+};
+
+function fxTrace(k, index) {
+  const c = cfg.trace, t0 = now(), dur = D(c.duration), s = S('trace');
+  const col = c.color === 'custom' ? c.custom : c.color === 'rainbow' ? null : accent();
+  const hue = (hexHue(accent()) + index * 38) % 360;
+  addFx((t) => {
+    const p = (t - t0) / dur;
+    if (p >= 1) return false;
+    const inset = 3 * (1 - easeOut(clamp01(p / 0.15))), f = Math.pow(1 - p, 1.5) * s;
+    roundRect(k.r.x + inset, k.r.y + inset, k.r.w - inset * 2, k.r.h - inset * 2, 9);
+    ctx.fillStyle = col ? rgba(col, 0.32 * f) : `hsla(${hue},90%,65%,${0.32 * f})`;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = col ? rgba(col, 0.85 * f) : `hsla(${hue},90%,65%,${0.85 * f})`;
+    ctx.stroke();
+    return true;
+  });
+}
+
+/* ---------- Letter hop v2: letters gather on the number row ---------- */
+let hop = null;
+function hopStart() {
+  if (!cfg.hop.on) return;
+  hop = { letters: [], state: 'collect', t0: now() };
+  ROW_EL[0].classList.add('hop');
+  const h = hop;
+  addFx((t) => {
+    const nums = KEYS.filter((k) => k.t === 'num');
+    const n = h.letters.length, left = nums[0].r.x, right = nums[nums.length - 1].r.x + nums[nums.length - 1].r.w;
+    const slotX = (i) => (n <= 10 ? nums[i].cx : left + (i + 0.5) * (right - left) / n);
+    const slotY = nums[0].cy, s = S('hop');
+    let alive = h.state === 'collect';
+    h.letters.forEach((l, i) => {
+      if (h.state === 'collect') {
+        const p = clamp01((t - l.t0) / D(280));
+        const tx = slotX(i), ep = easeOut(p);
+        l.x = p < 1 ? lerp(l.fx, tx, ep) : l.x + (tx - l.x) * 0.3;
+        l.y = p < 1 ? lerp(l.fy, slotY, ep) - 24 * Math.sin(Math.PI * ep) : slotY;
+        glowText(l.g, l.x, l.y, 20, 0.8 + 0.2 * ep, clamp01(p * 4) * s);
+        return;
+      }
+      const e = t - h.exitAt - i * D(h.exit === 'burn' ? 28 : 34);
+      if (e < 0) { alive = true; glowText(l.g, l.x, l.y, 20, 1, s); return; }
+      if (h.exit === 'burn') {
+        const u = e / D(520);
+        if (u >= 1) return;
+        alive = true;
+        if (!l.embers) {
+          l.embers = true;
+          emberBurst(l.x, l.y, s);
+        }
+        glowText(l.g, l.x + rand(-1, 1) * (1 - u), l.y - 6 * u, 20, 1 - 0.4 * u, (1 - u) * s, mix(accent(), '#FF8A3D', clamp01(u * 2.5)));
+      } else if (h.exit === 'fly') {
+        const del = keyOf((k) => k.t === 'del'), u = e / D(420);
+        if (u >= 1) { if (!l.landed) { l.landed = true; fxPop(del); } return; }
+        alive = true;
+        const p = easeIn(u) * 0.6 + u * 0.4;
+        const x = lerp(l.x, del.cx, p), y = lerp(l.y, del.cy, p) - 40 * Math.sin(Math.PI * p);
+        glowText(l.g, x, y, 20, 1 - 0.65 * p, (1 - u * 0.5) * s);
+      } else {
+        // Form: slide into the word above the suggestions, hold, then pop
+        const u = e / D(260), hold = D(380), w = h.word, m = w.length;
+        const tx = SUGG.x + SUGG.w / 2 + (l.wi - (m - 1) / 2) * 13, ty = SUGG.y + SUGG.h / 2;
+        if (l.wi < 0) {
+          const fu = clamp01(u);
+          if (fu >= 1) return;
+          alive = true;
+          glowText(l.g, l.x, l.y + 300 * fu * fu, 20, 1, (1 - fu) * s);
+          return;
+        }
+        if (e > D(260) + hold + D(240)) return;
+        alive = true;
+        const pu = clamp01(u), x = lerp(l.x, tx, easeOutBack(pu)), y = lerp(l.y, ty, easeOutBack(pu));
+        const popU = clamp01((e - D(260) - hold) / D(240));
+        glowText(w[l.wi], x, y, 20, 1.1 + 0.4 * popU, (1 - popU) * s);
+      }
+    });
+    if (!alive && h.state !== 'collect') {
+      if (hop === h || !hop) ROW_EL[0].classList.remove('hop');
+      return false;
+    }
+    return true;
+  });
+}
+function hopAdd(k) {
+  if (!hop || hop.state !== 'collect' || hop.letters.length >= 24) return;
+  hop.letters.push({ g: k.c, fx: k.cx, fy: k.cy, x: k.cx, y: k.cy, t0: now() });
+}
+function hopFinish(word) {
+  if (!hop) return;
+  const h = hop;
+  h.state = 'exit';
+  h.exit = cfg.hop.exit;
+  h.exitAt = now();
+  h.word = word;
+  if (h.exit === 'form') {
+    let j = 0;
+    for (const l of h.letters) l.wi = -1;
+    [...word.toLowerCase()].forEach((ch, wi) => {
+      for (let k = j; k < h.letters.length; k++) if (h.letters[k].g === ch) { h.letters[k].wi = wi; j = k + 1; return; }
+    });
+  }
+  hop = null;
+  kick();
+}
+function emberBurst(x, y, s) {
+  const t0 = now(), parts = Array.from({ length: 7 }, () => ({ vx: rand(-25, 25), vy: -rand(30, 90), r: rand(1.2, 2.6) }));
+  addFx((t) => {
+    const e = (t - t0) / 1000, p = (t - t0) / D(600);
+    if (p >= 1) return false;
+    for (const q of parts) {
+      ctx.fillStyle = fire(p, (1 - p) * s);
+      ctx.beginPath();
+      ctx.arc(x + q.vx * e, y + q.vy * e, q.r * (1 - p * 0.5), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return true;
+  });
+}
+
+/* ---------- Constellation ---------- */
+let cons = null;
+function consStart() {
+  if (!cfg.constellation.on) return;
+  cons = { pts: [], state: 'live' };
+  const cs = cons;
+  addFx((t) => {
+    const c = cfg.constellation, s = S('constellation');
+    const target = { x: SUGG.x + SUGG.w / 2, y: SUGG.y + SUGG.h / 2 };
+    let fold = 0;
+    if (cs.state === 'fold') {
+      fold = clamp01((t - cs.foldAt) / D(c.fold));
+      if (fold >= 1) {
+        const fp = clamp01((t - cs.foldAt - D(c.fold)) / D(260));
+        if (fp >= 1) return false;
+        starPath(target.x, target.y, 6 + 18 * easeOut(fp), 4, 0.25, fp);
+        ctx.fillStyle = rgba(accent(), (1 - fp) * s);
+        ctx.fill();
+        return true;
+      }
+    }
+    const pos = cs.pts.map((p) => ({ x: lerp(p.x, target.x, easeIn(fold)), y: lerp(p.y, target.y, easeIn(fold)), t0: p.t0 }));
+    ctx.save();
+    ctx.shadowColor = rgba(accent(), s);
+    ctx.shadowBlur = 8 * c.glow;
+    ctx.strokeStyle = rgba(accent(), 0.55 * (1 - fold * 0.5) * s);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    pos.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.stroke();
+    for (const p of pos) {
+      const grow = easeOutBack(clamp01((t - p.t0) / D(220)));
+      starPath(p.x, p.y, c.star * grow * (1 - fold * 0.5), 4, 0.35, (t - p.t0) / 600);
+      ctx.fillStyle = `rgba(255,255,255,${0.95 * s})`;
+      ctx.fill();
+    }
+    ctx.restore();
+    return true;
+  });
+}
+
+/* ---------- Commit burst ---------- */
+function fxBurst() {
+  const c = cfg.burst, t0 = now(), x = SUGG.x + SUGG.w / 2, y = SUGG.y + SUGG.h / 2, base = hexHue(accent()), s = S('burst');
+  const parts = Array.from({ length: Math.round(c.count) }, () => ({ vx: rand(-150, 150), vy: -rand(80, 220), rot: rand(0, 6), spin: rand(-10, 10), hue: (base + rand(-40, 120)) % 360 }));
+  addFx((t) => {
+    const e = (t - t0) / 1000, p = (t - t0) / D(900);
+    if (p >= 1) return false;
+    for (const q of parts) {
+      ctx.save();
+      ctx.translate(x + q.vx * e, y + q.vy * e + 420 * e * e);
+      ctx.rotate(q.rot + q.spin * e);
+      ctx.fillStyle = `hsla(${q.hue},90%,66%,${(1 - p) * s})`;
+      ctx.fillRect(-2, -3.5, 4, 7);
+      ctx.restore();
+    }
+    return true;
+  });
+}
+
+/* ---------- Hold charge: ring or liquid fill ---------- */
+let charge = null;
+function chargeStart(k, x) {
+  if (!cfg.ring.on) return;
+  const c = cfg.ring, t0 = now(), ch = { cancelled: false };
+  charge = ch;
+  const timeout = c.timeout, appear = timeout * c.appear / 100, s = S('ring');
+  const cx = k.t === 'space' ? x : k.cx, cy = k.cy, rad = k.t === 'space' ? k.r.h * 0.6 : Math.max(k.r.w, k.r.h) * 0.55;
+  addFx((t) => {
+    if (ch.cancelled) return false;
+    const e = t - t0;
+    if (e >= timeout) {
+      if (c.style === 'liquid') splash(k, s); else ringPop(cx, cy, rad * 1.7, s);
+      return false;
+    }
+    if (e < appear) return true;
+    const p = (e - appear) / (timeout - appear), fadeIn = clamp01((e - appear) / 80);
+    if (c.style === 'ring') {
+      ctx.lineCap = 'round';
+      ctx.lineWidth = c.thickness;
+      ctx.strokeStyle = rgba(accent(), 0.18 * fadeIn * s);
+      ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = rgba(accent(), 0.9 * fadeIn * s);
+      ctx.beginPath(); ctx.arc(cx, cy, rad, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p); ctx.stroke();
+    } else {
+      // Liquid: the key fills from the bottom with a moving wave on top
+      ctx.save();
+      roundRect(k.r.x, k.r.y, k.r.w, k.r.h, 9);
+      ctx.clip();
+      const level = k.r.y + k.r.h * (1 - p), ph = t / 140;
+      ctx.beginPath();
+      ctx.moveTo(k.r.x, k.r.y + k.r.h);
+      for (let xx = 0; xx <= k.r.w; xx += 3) ctx.lineTo(k.r.x + xx, level + Math.sin(xx / 7 + ph) * c.wave * (1 - p * 0.5));
+      ctx.lineTo(k.r.x + k.r.w, k.r.y + k.r.h);
+      ctx.closePath();
+      ctx.fillStyle = rgba(accent(), 0.5 * fadeIn * s);
+      ctx.fill();
+      ctx.restore();
+    }
+    return true;
+  });
+}
+function chargeCancel() { if (charge) { charge.cancelled = true; charge = null; } }
+function ringPop(x, y, r, s) {
+  const t0 = now();
+  addFx((t) => {
+    const p = (t - t0) / D(380);
+    if (p >= 1) return false;
+    ctx.lineWidth = 3 - 2 * p;
+    ctx.strokeStyle = rgba(accent(), 0.7 * (1 - p) * s);
+    ctx.beginPath(); ctx.arc(x, y, r * easeOut(p), 0, Math.PI * 2); ctx.stroke();
+    return true;
+  });
+}
+function splash(k, s) {
+  const t0 = now(), drops = Array.from({ length: 8 }, () => ({ x: rand(k.r.x + 4, k.r.x + k.r.w - 4), vx: rand(-40, 40), vy: -rand(80, 170) }));
+  addFx((t) => {
+    const e = (t - t0) / 1000, p = (t - t0) / D(480);
+    if (p >= 1) return false;
+    ctx.fillStyle = rgba(accent(), (1 - p) * 0.9 * s);
+    for (const d of drops) { ctx.beginPath(); ctx.arc(d.x + d.vx * e, k.r.y + d.vy * e + 520 * e * e, 2.2, 0, Math.PI * 2); ctx.fill(); }
+    roundRect(k.r.x, k.r.y, k.r.w, k.r.h, 9);
+    ctx.fillStyle = rgba(accent(), 0.45 * (1 - p) * s);
+    ctx.fill();
+    return true;
+  });
+}
+
+/* ---------- Spacebar trackpad ---------- */
+const trackpad = {
+  level: 0, target: 0, last: 0, x: 0, y: 0,
+  show(x, y) { this.target = 1; this.x = x; this.y = y; if (cfg.trackpad.on) dock.classList.add('tp'); kick(); },
+  move(x, y) { this.x = x; this.y = y; kick(); },
+  hide() { this.target = 0; dock.classList.remove('tp'); kick(); },
+  draw(t) {
+    const dt = this.last ? t - this.last : 0;
+    this.last = t;
+    this.level = this.level < this.target ? Math.min(1, this.level + dt / 150) : Math.max(this.target, this.level - dt / 200);
+    if (!cfg.trackpad.on || this.level <= 0) { this.last = this.level > 0 ? t : 0; return false; }
+    const c = cfg.trackpad, s = S('trackpad'), L = this.level;
+    document.documentElement.style.setProperty('--tp-label', String(1 - c.labels));
+    ctx.fillStyle = cfg.global.kbTheme === 'light' ? `rgba(228,231,236,${c.dim * L * s})` : `rgba(10,11,14,${c.dim * L * s})`;
+    ctx.fillRect(KB.x, KB.y, KB.w, KB.h);
+    const step = 22;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = rgba(accent(), 0.4 * c.grid * L * s);
+    ctx.beginPath();
+    for (let x = KB.x + ((this.x - KB.x) % step); x < KB.x + KB.w; x += step) { ctx.moveTo(x, KB.y); ctx.lineTo(x, KB.y + KB.h); }
+    for (let y = KB.y + ((this.y - KB.y) % step); y < KB.y + KB.h; y += step) { ctx.moveTo(KB.x, y); ctx.lineTo(KB.x + KB.w, y); }
+    ctx.stroke();
+    if (c.halo > 0) {
+      const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, c.halo * 1.6);
+      g.addColorStop(0, rgba(accent(), 0.55 * L * s));
+      g.addColorStop(1, rgba(accent(), 0));
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(this.x, this.y, c.halo * 1.6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = rgba(accent(), 0.5 * L * s);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(this.x, this.y, c.halo, 0, Math.PI * 2); ctx.stroke();
+    }
+    return this.level !== this.target || this.target > 0;
+  },
+};
+
+/* ---------- Accent popup: row or bloom arc ---------- */
+let popup = null;
+function openPopup(k) {
+  const chars = [...(ACCENTS[k.c] || '')].map((ch) => (shifted() ? ch.toUpperCase() : ch));
+  if (!chars.length) return false;
+  popupEl.innerHTML = '';
+  popupEl.hidden = false;
+  const items = [];
+  const n = chars.length, bloom = cfg.popup.style === 'bloom';
+  chars.forEach((ch, i) => {
+    let x, y;
+    if (bloom) {
+      // Fan out on an arc above the key, clamped inside the dock
+      const span = Math.min(Math.PI * 0.95, 0.42 * n), a = -Math.PI / 2 - span / 2 + (n === 1 ? span / 2 : (span * i) / (n - 1));
+      x = clamp(k.cx + Math.cos(a) * cfg.popup.radius, 22, DW - 22);
+      y = Math.max(26, k.cy + Math.sin(a) * cfg.popup.radius);
+    } else {
+      const w = 42, startX = clamp(k.cx - ((n - 1) * w) / 2, 24, DW - 24 - (n - 1) * w);
+      x = startX + i * w;
+      y = k.r.y - 30;
+    }
+    const el = document.createElement('div');
+    el.className = 'pk';
+    el.textContent = ch;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    popupEl.appendChild(el);
+    if (bloom) el.animate([{ transform: `translate(${k.cx - x}px,${k.cy - y}px) scale(0.3)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: D(220), delay: D(i * 22), easing: 'cubic-bezier(.34,1.5,.64,1)', fill: 'backwards' });
+    items.push({ ch, x, y, el });
+  });
+  popupEl.style.left = '0px';
+  popupEl.style.top = '0px';
+  popup = { items, sel: 0 };
+  selectPopup(0);
+  return true;
+}
+function selectPopup(i) { popup.sel = i; popup.items.forEach((it, j) => it.el.classList.toggle('sel', j === i)); }
+function popupMove(x, y) {
+  let best = popup.sel, bd = Infinity;
+  popup.items.forEach((it, i) => { const d = Math.hypot(it.x - x, it.y - y); if (d < bd) { bd = d; best = i; } });
+  selectPopup(best);
+}
+function closePopup() { popupEl.hidden = true; popupEl.innerHTML = ''; popup = null; }
+
+/* ================================================================
+   Input: one pointer at a time, shared by real touches and demos
+   ================================================================ */
+const P = { active: false };
+const LONG_KEYS = (k) => (k.t === 'char' && ACCENTS[k.c]) || k.t === 'space';
+
+function inDown(x, y) {
+  if (P.active) inUp(); // rollover: a new finger finishes the previous key, like FUTO
+  const k = hit(x, y);
+  if (!k) return;
+  Object.assign(P, { active: true, k, x0: x, y0: y, x, y, mode: 'tap', crossed: [], lastKey: k, timer: 0 });
+  k.el.classList.add('pressed');
+  if (cfg.pop.on) fxPop(k);
+  if (cfg.wave.on && k.row > 0) fxWave(k);
+  if (LONG_KEYS(k)) {
+    chargeStart(k, x);
+    P.timer = setTimeout(() => onLongPress(k), cfg.ring.timeout);
+  }
+  if (k.t === 'del') P.timer = setTimeout(() => startDeleteRepeat(k), cfg.ring.timeout);
+  if (isLetter(k)) P.crossed = [k];
+}
+
+function onLongPress(k) {
+  if (!P.active || P.k !== k || P.mode !== 'tap') return;
+  if (k.t === 'space') { P.mode = 'cursor'; P.ax = P.x; P.ay = P.y; trackpad.show(P.x, P.y); return; }
+  if (openPopup(k)) P.mode = 'popup';
+}
+
+function startDeleteRepeat(k) {
+  if (!P.active || P.k !== k) return;
+  P.mode = 'delhold';
+  startHoldDelete(k);
+  const t0 = now();
+  const tick = () => {
+    if (!P.active || P.mode !== 'delhold') return;
+    swallow(deleteChar());
+    typingSuggestions();
+    P.timer = setTimeout(tick, Math.max(35, 95 - (now() - t0) / 20));
+  };
+  tick();
+}
+
+function inMove(x, y) {
+  if (!P.active) return;
+  P.x = x; P.y = y;
+  const k = P.k, dist = Math.hypot(x - P.x0, y - P.y0);
+  if (P.mode === 'tap') {
+    if (k.t === 'space' && dist > 12) {
+      clearTimeout(P.timer); chargeCancel();
+      P.mode = 'cursor'; P.ax = x; P.ay = y; trackpad.show(x, y);
+    } else if (isLetter(k) && dist > k.r.w * 0.6) {
+      clearTimeout(P.timer); chargeCancel();
+      startSwipe();
+    } else if (dist > 10) {
+      clearTimeout(P.timer); chargeCancel();
+    }
+  }
+  if (P.mode === 'swipe') swipeMove(x, y);
+  else if (P.mode === 'cursor') {
+    trackpad.move(x, y);
+    const dx = x - P.ax, dy = y - P.ay;
+    if (Math.abs(dy) >= 24 && Math.abs(dy) >= Math.abs(dx)) { const n = Math.trunc(dy / 24); for (let i = 0; i < Math.abs(n); i++) moveLine(Math.sign(n)); P.ay += n * 24; P.ax = x; }
+    else if (Math.abs(dx) >= 14) { const n = Math.trunc(dx / 14); moveCaret(n); P.ax += n * 14; P.ay = y; }
+  } else if (P.mode === 'popup') popupMove(x, y);
+}
+
+function inUp() {
+  if (!P.active) return;
+  const k = P.k;
+  clearTimeout(P.timer);
+  chargeCancel();
+  k.el.classList.remove('pressed');
+  P.active = false;
+  switch (P.mode) {
+    case 'tap': commitTap(k, P.x0); break;
+    case 'swipe': finishSwipe(); break;
+    case 'cursor': trackpad.hide(); typingSuggestions(); break;
+    case 'popup': if (popup) insertText(popup.items[popup.sel].ch); closePopup(); typingSuggestions(); break;
+    case 'delhold': hole = null; kick(); break;
+  }
+}
+
+function commitTap(k, x) {
+  lastCommit = null;
+  switch (k.t) {
+    case 'char': case 'num': {
+      const g = k.t === 'char' && shifted() ? k.c.toUpperCase() : k.c;
+      insertText(g);
+      if (cfg.float.on) fxFloat(k, g);
+      break;
+    }
+    case 'space':
+      insertText(' ');
+      if (cfg.space.on) fxSpace(k, x);
+      break;
+    case 'enter':
+      insertText('\n');
+      if (cfg.enter.on) fxEnter(k);
+      break;
+    case 'del':
+      deleteChar();
+      if (cfg.del.on) fxDelTap(k);
+      break;
+    case 'shift':
+      shift = shift === 0 ? 1 : shift === 1 ? 2 : 0;
+      updateShiftUI();
+      return;
+    default: return;
+  }
+  if (cfg.heat.on) heat.add(cfg.heat.build);
+  typingSuggestions();
+}
+
+/* ---------- Swipe typing ---------- */
+function startSwipe() {
+  P.mode = 'swipe';
+  trail.start(P.x0, P.y0);
+  hopStart();
+  consStart();
+  // The first key was touched before the swipe was recognized: give it its effects now
+  P.crossed.forEach((k, i) => crossKey(k, i));
+}
+function crossKey(k, i) {
+  if (cfg.trace.on) fxTrace(k, i);
+  hopAdd(k);
+  if (cons) cons.pts.push({ x: k.cx, y: k.cy, t0: now() });
+  if (cfg.heat.on && cfg.heat.swipe) heat.add(cfg.heat.build * 0.6);
+}
+function swipeMove(x, y) {
+  trail.add(x, y);
+  const k = hit(x, y);
+  if (!k || k === P.lastKey) return;
+  P.lastKey = k;
+  if (!isLetter(k)) return;
+  P.crossed.push(k);
+  crossKey(k, P.crossed.length - 1);
+  const seq = P.crossed.map((c) => c.c).join('');
+  const live = decode(seq, false);
+  setSuggestions(live, live[0] ? subseqCount(collapse(live[0]), seq) : 0);
+}
+/** Letters under the points where the finger path turns by more than about 55 degrees. */
+function pathCorners() {
+  const pts = [];
+  for (const p of trail.pts) {
+    const l = pts[pts.length - 1];
+    if (!l || Math.hypot(p.x - l.x, p.y - l.y) >= 12) pts.push(p);
+  }
+  const turnAt = (i) => {
+    const a = pts[i - 2], b = pts[i], c = pts[i + 2];
+    let turn = Math.abs(Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(b.y - a.y, b.x - a.x));
+    return turn > Math.PI ? Math.PI * 2 - turn : turn;
+  };
+  let out = '', best = -1, bestTurn = 0;
+  // Neighbouring samples around one turn all exceed the threshold: keep only the sharpest
+  const flush = () => {
+    if (best < 0) return;
+    const k = hit(pts[best].x, pts[best].y);
+    if (isLetter(k) && out[out.length - 1] !== k.c) out += k.c;
+    best = -1;
+    bestTurn = 0;
+  };
+  for (let i = 2; i < pts.length - 2; i++) {
+    const turn = turnAt(i);
+    if (turn < 0.95) { flush(); continue; }
+    if (turn > bestTurn) { bestTurn = turn; best = i; }
+  }
+  flush();
+  return out;
+}
+function finishSwipe() {
+  const corners = pathCorners();
+  trail.end();
+  const seq = P.crossed.map((c) => c.c).join('');
+  const words = decode(seq, true, corners);
+  let w = words[0] || seq;
+  if (shifted()) w = w[0].toUpperCase() + w.slice(1);
+  const before = text.slice(0, caret);
+  const lead = before && !/[\s]$/.test(before) ? ' ' : '';
+  const start = caret + lead.length;
+  insertText(lead + w + ' ');
+  lastCommit = { start, end: caret };
+  setSuggestions(words.length ? words : [w], w.length);
+  hopFinish(w);
+  if (cons) { cons.state = 'fold'; cons.foldAt = now(); cons = null; }
+  if (cfg.burst.on) fxBurst();
+  kick();
+}
+
+/* ---------- Real pointer events ---------- */
+let livePointer = null;
+function local(e) { const r = dock.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+kb.addEventListener('pointerdown', (e) => {
+  if (demo.running) demo.cancel();
+  e.preventDefault();
+  if (livePointer !== null && livePointer !== e.pointerId) inUp();
+  livePointer = e.pointerId;
+  kb.setPointerCapture(e.pointerId);
+  inDown(...local(e));
+});
+kb.addEventListener('pointermove', (e) => { if (e.pointerId === livePointer) inMove(...local(e)); });
+const release = (e) => { if (e.pointerId === livePointer) { livePointer = null; inUp(); } };
+kb.addEventListener('pointerup', release);
+kb.addEventListener('pointercancel', release);
+kb.addEventListener('contextmenu', (e) => e.preventDefault());
+
+/* ================================================================
+   Show and hide
+   ================================================================ */
+const fab = $('#kbFab');
+let kbOpen = false;
+// Hide animations are kept by reference: once the dock is display:none the browser
+// stops listing them, so they could otherwise never be cancelled and the rows stay invisible
+let hideAnims = [];
+function clearHideAnims() { hideAnims.forEach((a) => a.cancel()); hideAnims = []; }
+
+async function showKeyboard() {
+  if (kbOpen) return;
+  kbOpen = true;
+  // Clear anything a previous hide left behind, so measuring sees the real layout
+  clearHideAnims();
+  dock.hidden = false;
+  document.body.classList.add('kb-open');
+  fab.setAttribute('aria-pressed', 'true');
+  fab.setAttribute('aria-label', 'Hide test keyboard');
+  measure();
+  renderField();
+  typingSuggestions();
+  void dock.offsetWidth; // let the hidden state paint before sliding up
+  dock.classList.add('open');
+  playShow();
+  await sleep(Math.max(260, D(cfg.show.duration) + D(cfg.show.stagger) * 6));
+  if (kbOpen) measure(); // fonts may have settled since the first measure
+}
+
+function playShow() {
+  const c = cfg.show, ease = `cubic-bezier(.34,${(1 + 0.45 * c.overshoot).toFixed(2)},.64,1)`;
+  if (c.mode === 'cascade') {
+    ROW_EL.forEach((row, i) => {
+      const h = row.getBoundingClientRect().height;
+      row.animate([{ transform: `translateY(${h * 0.9}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }],
+        { duration: D(c.duration), delay: D((ROW_EL.length - 1 - i) * c.stagger), easing: ease, fill: 'backwards' });
+    });
+  } else if (c.mode === 'bloom') {
+    const cx = KB.x + KB.w / 2, cy = KB.y + KB.h / 2;
+    for (const k of KEYS) {
+      const d = Math.hypot(k.cx - cx, (k.cy - cy) * 1.4);
+      k.el.animate([{ transform: 'scale(0.2)', opacity: 0 }, { transform: 'none', opacity: 1 }],
+        { duration: D(c.duration), delay: D((d / 40) * c.stagger * 0.5), easing: ease, fill: 'backwards' });
+    }
+  }
+}
+
+async function hideKeyboard() {
+  if (!kbOpen) return;
+  kbOpen = false;
+  if (P.active) inUp();
+  fab.setAttribute('aria-pressed', 'false');
+  fab.setAttribute('aria-label', 'Show test keyboard');
+  if (cfg.hide.mode === 'dip') {
+    ROW_EL.forEach((row, i) => hideAnims.push(row.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateY(14px)', opacity: 0 }],
+      { duration: D(cfg.hide.duration), delay: D(i * 18), easing: 'ease-in', fill: 'forwards' })));
+    await sleep(D(cfg.hide.duration) + D(90));
+  }
+  dock.classList.remove('open');
+  document.body.classList.remove('kb-open');
+  await sleep(240);
+  if (!kbOpen) {
+    dock.hidden = true;
+    clearHideAnims();
+  }
+}
+fab.addEventListener('click', () => (kbOpen ? hideKeyboard() : showKeyboard()));
+addEventListener('resize', () => { if (kbOpen) measure(); });
+
+/* ================================================================
+   Previews: scripted touches through the same input path
+   ================================================================ */
+const demo = {
+  running: false, token: 0,
+  cancel() { this.token++; this.running = false; if (P.active) inUp(); },
+};
+async function runDemo(kind, id) {
+  // Make sure the effect being previewed is on
+  if (id && cfg[id] && 'on' in cfg[id] && !cfg[id].on) {
+    cfg[id].on = true;
+    const box = $(`#${id}-on`);
+    if (box) box.checked = true;
+    changed(id);
+  }
+  demo.cancel();
+  const my = ++demo.token;
+  demo.running = true;
+  const alive = () => demo.token === my;
+  if (kind === 'show') {
+    await hideKeyboard();
+    await sleep(250);
+    if (!alive()) return;
+    await showKeyboard();
+    demo.running = false;
+    return;
+  }
+  if (!kbOpen) { await showKeyboard(); }
+  await sleep(150);
+  const tap = async (k, hold = 70, gap = 120) => {
+    if (!alive() || !k) return;
+    inDown(k.cx, k.cy); await sleep(hold);
+    if (!alive()) return;
+    inUp(); await sleep(gap);
+  };
+  const typeStr = async (s, gap) => {
+    for (const ch of s) {
+      if (!alive()) return;
+      if (ch === ' ') { await tap(keyOf((k) => k.t === 'space'), 60, gap); continue; }
+      const upper = ch !== ch.toLowerCase();
+      if (upper && !shifted()) await tap(keyOf((k) => k.t === 'shift'), 60, 60);
+      await tap(charKey(ch), 60, gap);
+    }
+  };
+  const swipeWord = async (word) => {
+    const keys = [...collapse(word)].map(charKey);
+    inDown(keys[0].cx, keys[0].cy);
+    for (let i = 1; i < keys.length; i++) {
+      const a = keys[i - 1], b = keys[i];
+      for (let s = 1; s <= 6; s++) {
+        if (!alive()) return;
+        inMove(lerp(a.cx, b.cx, s / 6) + rand(-2, 2), lerp(a.cy, b.cy, s / 6) + rand(-2, 2));
+        await sleep(16);
+      }
+    }
+    await sleep(40);
+    inUp();
+    await sleep(900);
+  };
+  switch (kind) {
+    case 'type': await typeStr('Hey Theo ', 170); break;
+    case 'heat': await typeStr('the quick brown fox jumps over ', 55); break;
+    case 'enter': await tap(keyOf((k) => k.t === 'enter'), 70, 600); break;
+    case 'space': for (let i = 0; i < 3; i++) await tap(keyOf((k) => k.t === 'space'), 70, 450); break;
+    case 'del': {
+      await typeStr('swallow this text', 50);
+      await tap(keyOf((k) => k.t === 'del'), 70, 500);
+      const d = keyOf((k) => k.t === 'del');
+      if (!alive()) break;
+      inDown(d.cx, d.cy); await sleep(1700);
+      if (alive()) inUp();
+      break;
+    }
+    case 'swipe': await swipeWord('hello'); if (alive()) await swipeWord('world'); break;
+    case 'ring': {
+      const e = charKey('e');
+      inDown(e.cx, e.cy); await sleep(cfg.ring.timeout + 450);
+      if (!alive()) break;
+      if (popup) { const it = popup.items[Math.min(1, popup.items.length - 1)]; inMove(it.x, it.y); await sleep(450); }
+      if (alive()) inUp();
+      break;
+    }
+    case 'trackpad': {
+      const sp = keyOf((k) => k.t === 'space');
+      let x = sp.cx, y = sp.cy;
+      inDown(x, y);
+      const path = [[90, 0], [0, -60], [0, 60], [-90, 0]];
+      for (const [dx, dy] of path) {
+        for (let s = 0; s < 14; s++) { if (!alive()) return; x += dx / 14; y += dy / 14; inMove(x, y); await sleep(28); }
+        await sleep(160);
+      }
+      if (alive()) inUp();
+      break;
+    }
+  }
+  if (alive()) demo.running = false;
+}
+
+/* ================================================================
+   Export, reset, boot
+   ================================================================ */
+function exportText() {
+  const lines = ['FUTO Tweaks Lab feedback', ''];
+  const named = {};
+  for (const sec of SECTIONS) for (const it of sec.items) named[it.id] = it.name;
+  const withNotes = Object.entries(notes).filter(([, v]) => v && v.trim());
+  if (withNotes.length) {
+    lines.push('Notes:');
+    for (const [id, v] of withNotes) lines.push(`- ${named[id] || id}: ${v.trim().replace(/\n+/g, ' ')}`);
+    lines.push('');
+  }
+  // Only list values that differ from the defaults, then the full set for the module
+  const diff = [];
+  for (const id in cfg) for (const k in cfg[id]) if (JSON.stringify(cfg[id][k]) !== JSON.stringify(DEFAULTS[id][k])) diff.push(`- ${named[id] || id} ${k}: ${DEFAULTS[id][k]} → ${cfg[id][k]}`);
+  lines.push(diff.length ? 'Changed from defaults:' : 'No settings changed from defaults.');
+  lines.push(...diff, '', 'Full settings:', JSON.stringify(cfg));
+  return lines.join('\n');
+}
+$('#exportBtn').addEventListener('click', () => {
+  $('#exportText').value = exportText();
+  $('#copyStatus').textContent = '';
+  $('#exportSheet').hidden = false;
+});
+$('#closeExport').addEventListener('click', () => { $('#exportSheet').hidden = true; });
+$('#exportSheet').addEventListener('click', (e) => { if (e.target.id === 'exportSheet') $('#exportSheet').hidden = true; });
+$('#copyExport').addEventListener('click', () => {
+  const ta = $('#exportText');
+  const done = (msg) => { $('#copyStatus').textContent = msg; };
+  try {
+    navigator.clipboard.writeText(ta.value).then(() => done('Copied'), () => { ta.select(); done('Selected, copy it from the menu'); });
+  } catch (e) { ta.select(); done('Selected, copy it from the menu'); }
+});
+let resetArmed = false;
+$('#resetBtn').addEventListener('click', (e) => {
+  const b = e.currentTarget;
+  if (!resetArmed) { resetArmed = true; b.textContent = 'Tap again to reset'; setTimeout(() => { resetArmed = false; b.textContent = 'Reset to defaults'; }, 2500); return; }
+  resetArmed = false;
+  b.textContent = 'Reset to defaults';
+  cfg = clone(DEFAULTS);
+  save();
+  buildSettings();
+  applyGlobal();
+});
+
+buildKeyboard();
+buildSettings();
+applyGlobal();
+renderField();
+typingSuggestions();
+</script>
+
+</body>
+</html>
