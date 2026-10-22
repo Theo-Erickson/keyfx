@@ -300,6 +300,18 @@ input[type="color"] { width: 44px; height: 30px; border: 1px solid var(--line); 
 .strip { background: var(--kb-strip); padding: 8px 12px 6px; }
 .strip-label { font: 500 10.5px/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--kb-label-2); display: flex; justify-content: space-between; }
 .strip-label button { font: inherit; letter-spacing: inherit; color: inherit; background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline; }
+.sim { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.sim button {
+  font: 500 12.5px/1 var(--font-body);
+  color: var(--kb-label);
+  background: var(--kb-key);
+  border: none;
+  border-radius: 999px;
+  padding: 7px 11px;
+  cursor: pointer;
+}
+.sim button.running { background: var(--accent); color: var(--on-accent); }
+.sim button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #field {
   margin-top: 6px;
   background: var(--kb-field);
@@ -390,7 +402,7 @@ input[type="color"] { width: 44px; height: 30px; border: 1px solid var(--line); 
     <h1>FUTO Tweaks Lab</h1>
     <p>Tune every effect against a mock of FUTO Keyboard. Tap the keyboard button in the corner to bring it up while you scroll, or use Preview on any card. Type, swipe words, hold e or a for accents, drag the spacebar, and hold backspace.</p>
     <div class="intro-actions">
-      <button class="btn primary" id="exportBtn" type="button">Export settings and notes</button>
+      <button class="btn primary" id="exportBtn" type="button">Export settings</button>
       <button class="btn" id="resetBtn" type="button">Reset to defaults</button>
     </div>
   </header>
@@ -401,6 +413,12 @@ input[type="color"] { width: 44px; height: 30px; border: 1px solid var(--line); 
   <div class="strip">
     <div class="strip-label"><span>Test field</span><button type="button" id="clearField">Clear</button></div>
     <div id="field" aria-label="Test text"></div>
+    <div class="sim" role="group" aria-label="Hands-free test">
+      <button type="button" id="simType">Type it</button>
+      <button type="button" id="simSwipe">Swipe it</button>
+      <button type="button" id="simPaste">Paste it</button>
+      <button type="button" id="simStop">Stop</button>
+    </div>
   </div>
   <div id="sugg"><button type="button" data-i="0"></button><button type="button" class="mid" data-i="1"></button><button type="button" data-i="2"></button></div>
   <div id="kb"></div>
@@ -410,7 +428,7 @@ input[type="color"] { width: 44px; height: 30px; border: 1px solid var(--line); 
 
 <div id="exportSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
-    <h2 id="exportTitle">Settings and notes</h2>
+    <h2 id="exportTitle">Settings</h2>
     <textarea id="exportText" readonly></textarea>
     <div class="card-foot">
       <button class="btn primary" type="button" id="copyExport">Copy</button>
@@ -691,9 +709,7 @@ function buildCard(item) {
   card.id = `card-${id}`;
   const toggle = item.noToggle ? '' : `<label class="switch" title="On or off"><input type="checkbox" id="${id}-on" aria-label="${item.name} on"><span></span></label>`;
   card.innerHTML = `<div class="card-head"><div><h3>${item.name}${item.tag ? `<span class="tag">${item.tag}</span>` : ''}</h3><p>${item.desc}</p></div>${toggle}</div><div class="fields"></div>
-    <div class="card-foot"><button type="button" class="btn small primary" id="${id}-preview">Preview</button>
-    <button type="button" class="btn small" id="${id}-notebtn" aria-expanded="false">Note</button></div>
-    <textarea class="note" id="${id}-note" placeholder="Feedback for this effect" hidden></textarea>`;
+    <div class="card-foot"><button type="button" class="btn small primary" id="${id}-preview">Preview</button></div>`;
   if (!item.noToggle) {
     const on = card.querySelector(`#${id}-on`);
     on.checked = !!c.on;
@@ -708,17 +724,6 @@ function buildCard(item) {
   }
   if (!item.fields.length) fields.remove();
   card.querySelector(`#${id}-preview`).addEventListener('click', () => runDemo(item.demo, id));
-  const noteBtn = card.querySelector(`#${id}-notebtn`), note = card.querySelector(`#${id}-note`);
-  note.value = notes[id] || '';
-  const markNote = () => noteBtn.classList.toggle('has-note', !!note.value.trim());
-  noteBtn.addEventListener('click', () => {
-    note.hidden = !note.hidden;
-    noteBtn.setAttribute('aria-expanded', String(!note.hidden));
-    if (!note.hidden) note.focus();
-  });
-  note.addEventListener('input', () => { notes[id] = note.value; markNote(); save(); });
-  if (note.value) { note.hidden = false; noteBtn.setAttribute('aria-expanded', 'true'); }
-  markNote();
   return card;
 }
 
@@ -1828,9 +1833,18 @@ function inUp() {
 }
 
 function commitTap(k, x) {
+  const prevCommit = lastCommit;
   lastCommit = null;
   switch (k.t) {
     case 'char': case 'num': {
+      // Punctuation right after a swiped word takes the place of its automatic space
+      if (/[,.!?;:]/.test(k.c) && text[caret - 1] === ' ' && prevCommit && caret === prevCommit.end) {
+        text = text.slice(0, caret - 1) + text.slice(caret);
+        caret--;
+        insertText(k.c + ' ');
+        if (cfg.float.on) fxFloat(k, k.c);
+        break;
+      }
       const g = k.t === 'char' && shifted() ? k.c.toUpperCase() : k.c;
       insertText(g);
       if (cfg.float.on) fxFloat(k, g);
@@ -1918,7 +1932,7 @@ function finishSwipe() {
   const corners = pathCorners();
   trail.end();
   const seq = P.crossed.map((c) => c.c).join('');
-  const words = decode(seq, true, corners);
+  const words = P.forcedWord ? [P.forcedWord] : decode(seq, true, corners);
   let w = words[0] || seq;
   if (shifted()) w = w[0].toUpperCase() + w.slice(1);
   const before = text.slice(0, caret);
@@ -2019,6 +2033,9 @@ async function hideKeyboard() {
 fab.addEventListener('click', () => (kbOpen ? hideKeyboard() : showKeyboard()));
 addEventListener('resize', () => { if (kbOpen) measure(); });
 
+/* Public-domain passage for the hands-free tests (Gettysburg Address, 1863). */
+const PASSAGE = 'Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal.';
+
 /* ================================================================
    Previews: scripted touches through the same input path
    ================================================================ */
@@ -2063,9 +2080,10 @@ async function runDemo(kind, id) {
       await tap(charKey(ch), 60, gap);
     }
   };
-  const swipeWord = async (word) => {
+  const swipeWord = async (word, pause = 900, forced = null) => {
     const keys = [...collapse(word)].map(charKey);
     inDown(keys[0].cx, keys[0].cy);
+    P.forcedWord = forced;
     for (let i = 1; i < keys.length; i++) {
       const a = keys[i - 1], b = keys[i];
       for (let s = 1; s <= 6; s++) {
@@ -2076,8 +2094,37 @@ async function runDemo(kind, id) {
     }
     await sleep(40);
     inUp();
-    await sleep(900);
+    P.forcedWord = null;
+    await sleep(pause);
   };
+  // Hands-free passage: typed key by key, or swiped word by word with punctuation tapped
+  const startLine = () => { if (text && !text.endsWith('\n')) insertText('\n'); };
+  if (kind === 'simType') {
+    startLine();
+    for (const ch of PASSAGE) {
+      if (!alive()) break;
+      await typeStr(ch, rand(70, 150));
+    }
+  } else if (kind === 'simSwipe') {
+    startLine();
+    for (const token of PASSAGE.split(' ')) {
+      if (!alive()) break;
+      const m = token.match(/^([A-Za-z]+)([,.]?)$/);
+      if (!m) { await typeStr(token + ' ', 90); continue; }
+      const [, word, punct] = m;
+      if (word !== word.toLowerCase() && !shifted()) await tap(keyOf((k) => k.t === 'shift'), 60, 80);
+      if (collapse(word.toLowerCase()).length === 1) {
+        await typeStr(word + (punct ? '' : ' '), 90);
+      } else {
+        await swipeWord(word.toLowerCase(), 260, word.toLowerCase());
+      }
+      if (punct && alive()) await tap(charKey(punct), 60, 160);
+    }
+  } else if (kind === 'simPaste') {
+    startLine();
+    insertText(PASSAGE);
+    typingSuggestions();
+  }
   switch (kind) {
     case 'type': await typeStr('Hey Theo ', 170); break;
     case 'heat': await typeStr('the quick brown fox jumps over ', 55); break;
@@ -2161,6 +2208,23 @@ $('#resetBtn').addEventListener('click', (e) => {
   save();
   buildSettings();
   applyGlobal();
+});
+
+function bindSim(id, kind) {
+  const b = $('#' + id);
+  b.addEventListener('click', async () => {
+    document.querySelectorAll('.sim button').forEach((x) => x.classList.remove('running'));
+    b.classList.add('running');
+    await runDemo(kind);
+    b.classList.remove('running');
+  });
+}
+bindSim('simType', 'simType');
+bindSim('simSwipe', 'simSwipe');
+bindSim('simPaste', 'simPaste');
+$('#simStop').addEventListener('click', () => {
+  demo.cancel();
+  document.querySelectorAll('.sim button').forEach((x) => x.classList.remove('running'));
 });
 
 buildKeyboard();
