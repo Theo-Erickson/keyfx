@@ -10,7 +10,8 @@ final class Modules {
         return concat(
                 TypingFx.sections(),
                 SpecialKeysFx.sections(),
-                DeleteHoldFx.sections());
+                DeleteHoldFx.sections(),
+                SwipeTrailFx.sections());
     }
 
     static FxModule[] create(KeyFx fx) {
@@ -18,6 +19,7 @@ final class Modules {
                 new TypingFx(fx),
                 new SpecialKeysFx(fx),
                 new DeleteHoldFx(fx),
+                new SwipeTrailFx(fx),
         };
     }
 
