@@ -9,13 +9,15 @@ final class Modules {
     static Section[] sections() {
         return concat(
                 TypingFx.sections(),
-                SpecialKeysFx.sections());
+                SpecialKeysFx.sections(),
+                DeleteHoldFx.sections());
     }
 
     static FxModule[] create(KeyFx fx) {
         return new FxModule[] {
                 new TypingFx(fx),
                 new SpecialKeysFx(fx),
+                new DeleteHoldFx(fx),
         };
     }
 
