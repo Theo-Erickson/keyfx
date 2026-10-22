@@ -7,11 +7,13 @@ final class Modules {
     private Modules() {}
 
     static Section[] sections() {
-        return concat();
+        return concat(
+                TypingFx.sections());
     }
 
     static FxModule[] create(KeyFx fx) {
         return new FxModule[] {
+                new TypingFx(fx),
         };
     }
 
