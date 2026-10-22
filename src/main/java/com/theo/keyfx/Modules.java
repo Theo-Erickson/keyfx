@@ -11,7 +11,8 @@ final class Modules {
                 TypingFx.sections(),
                 SpecialKeysFx.sections(),
                 DeleteHoldFx.sections(),
-                SwipeTrailFx.sections());
+                SwipeTrailFx.sections(),
+                SwipeWordFx.sections());
     }
 
     static FxModule[] create(KeyFx fx) {
@@ -20,6 +21,7 @@ final class Modules {
                 new SpecialKeysFx(fx),
                 new DeleteHoldFx(fx),
                 new SwipeTrailFx(fx),
+                new SwipeWordFx(fx),
         };
     }
 
