@@ -8,12 +8,14 @@ final class Modules {
 
     static Section[] sections() {
         return concat(
-                TypingFx.sections());
+                TypingFx.sections(),
+                SpecialKeysFx.sections());
     }
 
     static FxModule[] create(KeyFx fx) {
         return new FxModule[] {
                 new TypingFx(fx),
+                new SpecialKeysFx(fx),
         };
     }
 
