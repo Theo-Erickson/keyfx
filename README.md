@@ -53,14 +53,14 @@ keyfx is a library, so it has no APK of its own. To try the effects on a phone, 
 
 | Group | Effects |
 |---|---|
-| Typing | Key pop, letter float (rise, grow or ghost key), heat streak, neighbor wave |
+| Typing | Key pop (scaling the real key in hosts with `CAP_KEY_TRANSFORM`), letter float (rise, grow or ghost key), heat streak, neighbor wave, ripple, sparks |
 | Special keys | Enter sweep; spacebar stars, puff or shimmer; backspace fire, slash or shatter, with the deleted letters burning, splitting or shattering too |
-| Backspace hold | The key becomes a black hole, lava, an opening box or a hole, and the deleted letters swirl in, fly on curves, or get one press each |
+| Backspace hold | The key becomes a black hole, lava (shaking the real key in hosts with `CAP_KEY_TRANSFORM`), an opening box or a hole, and the deleted letters swirl in, fly on curves, or get one press each |
 | Swipe trail | Key trace, comet, ink brush, stardust |
 | Swipe word | Letter hop on the number row (or the top row), constellation, commit burst |
 | Long press | Hold charge, as a ring or a liquid fill |
 | Spacebar | Trackpad mode, with key labels fading out (hosts with `CAP_KEY_TRANSFORM`) |
-| Show and hide | Center bloom or row cascade on show; a dip on hide (hosts with `CAP_HIDE_ANIMATION`) |
+| Show and hide | Center bloom or row cascade on show, key by key in hosts with `CAP_KEY_TRANSFORM`; a dip on hide (hosts with `CAP_HIDE_ANIMATION`) |
 | Accent popup | Bloom arc layout (hosts with `CAP_POPUP_LAYOUT`) |
 | Suggestion bar | Light up the predicted word (hosts with `CAP_SUGGESTION_STYLE`) |
 
@@ -113,9 +113,19 @@ fx.deleteTap(FxKey k, FxLetter... letters);            // everything one press d
 fx.deleteHoldStart(FxKey k); fx.deleteHoldLetter(FxLetter l); fx.deleteHoldEnd();  // hold: one call per letter, right to left
 fx.longPressStart(FxKey k, float x, long timeoutMs); fx.longPressEnd();
 fx.swipeStart(); fx.swipePoint(float x, float y, long t); fx.swipeEnd(); fx.swipeWord(String word); fx.swipeCancel();
+fx.swipeGuess(String word);             // live best guess during a swipe, for the word highlight
 fx.cursorMode(boolean on, float x, float y); fx.cursorMove(float x, float y);
 fx.show(Bitmap snapshot, Runnable onDone);  // returns true if animating; host hides its view until onDone
 fx.hide(Bitmap snapshot, Runnable onDone);  // CAP_HIDE_ANIMATION hosts only
+
+// Hosts that draw more than the overlay
+fx.setHost(FxHost host);                // redrawKeys() and wordChanged() callbacks
+fx.look(FxKey k, KeyLook out);          // CAP_KEY_TRANSFORM: scale, move, fade this real key now
+fx.showNeedsSnapshot();                 // false: call show(null, onDone), keys animate through look()
+fx.word();                              // CAP_SUGGESTION_STYLE: the predicted word and lit letters
+fx.popupLayout(FxKey k, int n, RectF bounds, float[] outXY);  // CAP_POPUP_LAYOUT: bloom arc
+fx.popupLook(int i, long msSinceOpen, float keyCx, float keyCy, float itemX, float itemY, KeyLook out);
+KeyFx.capTitle(int cap); KeyFx.capReason(int cap);  // wording for settings screens
 ```
 
 ## Writing a host
@@ -127,11 +137,13 @@ fx.hide(Bitmap snapshot, Runnable onDone);  // CAP_HIDE_ANIMATION hosts only
 
    | Flag | Lets keyfx |
    |---|---|
-   | `CAP_KEY_TRANSFORM` | fade key labels in the trackpad, and move or hide real keys |
-   | `CAP_SUGGESTION_STYLE` | light up the predicted word in the suggestion bar |
-   | `CAP_POPUP_LAYOUT` | lay out the accent popup as a bloom arc |
+   | `CAP_KEY_TRANSFORM` | scale, shake and fade the real keys through `look()`: key pop, lava shake, trackpad label fade, key-by-key show |
+   | `CAP_SUGGESTION_STYLE` | light up the predicted word in the suggestion bar through `word()` |
+   | `CAP_POPUP_LAYOUT` | lay out the accent popup as a bloom arc through `popupLayout()` and `popupLook()` |
    | `CAP_EXACT_WORD` | use the exact swiped word instead of a guess from committed text |
    | `CAP_HIDE_ANIMATION` | play the hide dip |
+
+   Hosts with any of the first three also call `setHost()`, so keyfx can ask them to redraw.
 
 5. **Settings.** keyfx reads one `SharedPreferences`, keys `"<sectionId>.<fieldKey>"`, with `"<sectionId>.on"` for sections that can be switched off. Ranges are floats and choices are strings. `Section` and `Field` describe every setting, so a host can generate its settings screen from them. Call `reload()` after a change to apply it at once.
 
