@@ -43,6 +43,34 @@ public final class KeyFx extends Drawable {
     /** The host can hold the keyboard on screen for a hide animation. */
     public static final int CAP_HIDE_ANIMATION = 16;
 
+    /** Every capability, in the order settings screens list them. */
+    public static final int[] CAPS = { CAP_KEY_TRANSFORM, CAP_SUGGESTION_STYLE, CAP_POPUP_LAYOUT, CAP_EXACT_WORD,
+            CAP_HIDE_ANIMATION };
+
+    /** A short heading for what a capability covers, for settings screens. */
+    public static String capTitle(int cap) {
+        switch (cap) {
+            case CAP_KEY_TRANSFORM: return "The real keys";
+            case CAP_SUGGESTION_STYLE: return "The suggestion bar";
+            case CAP_POPUP_LAYOUT: return "The accent popup";
+            case CAP_EXACT_WORD: return "The exact swiped word";
+            case CAP_HIDE_ANIMATION: return "Keyboard hiding";
+            default: return "";
+        }
+    }
+
+    /** Why a host without this capability can't offer its settings, in one sentence. */
+    public static String capReason(int cap) {
+        switch (cap) {
+            case CAP_KEY_TRANSFORM: return "The keyboard draws its keys itself, so effects can only draw on top of them.";
+            case CAP_SUGGESTION_STYLE: return "The keyboard draws the suggestion bar itself, so effects can't restyle its words.";
+            case CAP_POPUP_LAYOUT: return "The keyboard lays out the accent popup itself, so effects can't rearrange it.";
+            case CAP_EXACT_WORD: return "The swiped word is only guessed from the text that appears.";
+            case CAP_HIDE_ANIMATION: return "The keyboard can't be held on screen while it slides away.";
+            default: return "";
+        }
+    }
+
     // How long after a swipe ends to wait for its word before telling modules there is none
     private static final long WORD_WAIT_MS = 900;
     private static final int MAX_EFFECTS = 500;
@@ -94,6 +122,9 @@ public final class KeyFx extends Drawable {
     private FxLayout layout = FxLayout.EMPTY;
     private int systemAccent = 0xFF8AB4F8;
     private boolean enabled = true;
+    private FxHost host;
+    private boolean keysWereMoving;
+    private WordLook word;
 
     // Settings read every frame, cached on reload()
     private int accent;
@@ -126,6 +157,8 @@ public final class KeyFx extends Drawable {
     public void reload() {
         settings.reload();
         refresh();
+        // A settings change can change key looks without any animation
+        if ((caps & CAP_KEY_TRANSFORM) != 0 && host != null) host.redrawKeys();
         invalidateSelf();
     }
 
@@ -161,6 +194,40 @@ public final class KeyFx extends Drawable {
         return layout;
     }
 
+    /** The host's callbacks, for hosts that draw more than this overlay. May stay null. */
+    public void setHost(FxHost h) {
+        host = h;
+    }
+
+    /**
+     * How the host should draw this real key now. Resets out, lets every module adjust it, and
+     * returns false when the key draws as normal. Hosts with CAP_KEY_TRANSFORM call it per key.
+     */
+    public boolean look(FxKey k, KeyLook out) {
+        out.reset();
+        if (!enabled || k == null) return false;
+        final long t = now();
+        for (FxModule m : modules) {
+            try {
+                m.look(k, out, t);
+            } catch (Throwable e) {
+                fail(m, e);
+            }
+        }
+        return !out.isPlain();
+    }
+
+    /** How the suggestion bar should show the predicted word, or null for normal. */
+    public WordLook word() {
+        return word;
+    }
+
+    void setWord(WordLook w) {
+        if (w == null ? word == null : w.sameAs(word)) return;
+        word = w;
+        if (host != null) host.wordChanged();
+    }
+
     /** Drops every running effect, for example when the keyboard hides. */
     public void reset() {
         effects.clear();
@@ -173,6 +240,10 @@ public final class KeyFx extends Drawable {
                 fail(m, t);
             }
         }
+        setWord(null);
+        // draw() won't run while disabled, so the keys must be restored here
+        keysWereMoving = false;
+        if (host != null && (caps & CAP_KEY_TRANSFORM) != 0) host.redrawKeys();
         invalidateSelf();
     }
 
@@ -380,6 +451,20 @@ public final class KeyFx extends Drawable {
             } catch (Throwable e) {
                 fail(m, e);
             }
+        }
+        // Hosts that draw real keys redraw them while a module moves them, and once more after
+        if ((caps & CAP_KEY_TRANSFORM) != 0) {
+            boolean moving = false;
+            for (FxModule m : modules) {
+                try {
+                    if (m.keysMoving(t)) moving = true;
+                } catch (Throwable e) {
+                    fail(m, e);
+                }
+            }
+            if ((moving || keysWereMoving) && host != null) host.redrawKeys();
+            keysWereMoving = moving;
+            if (moving) alive = true;
         }
         if (alive) invalidateSelf();
     }
@@ -654,6 +739,18 @@ public final class KeyFx extends Drawable {
         if (wordDeadline == 0) return;
         wordDeadline = 0;
         dispatchWord(word);
+    }
+
+    /** The host's live best guess at the word during a swipe. Hosts without one never call it. */
+    public void swipeGuess(String word) {
+        if (!swipe.active) return;
+        for (FxModule m : modules) {
+            try {
+                m.onSwipeGuess(word);
+            } catch (Throwable e) {
+                fail(m, e);
+            }
+        }
     }
 
     /** True while a swiped word is still expected, so hosts know a commit may be that word. */
