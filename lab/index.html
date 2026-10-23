@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>[hidden]{display:none!important}body{margin:0}</style>
-<title>FUTO Tweaks Lab</title>
+<title>keyfx Lab</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,7 +12,7 @@
 </head>
 <body>
 <style>
-/* Layout: a single settings column (two on wide screens) above a phone-width mock keyboard
+/* Layout: a single settings column (two on wide screens, cards equal height per section) above a phone-width mock keyboard
    docked to the bottom, summoned by a floating button pinned to the top-right corner. */
 :root {
   --bg: #EDEFF3;
@@ -175,17 +175,24 @@ h1 {
 }
 .section > p { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
 .cards { display: grid; gap: 12px; grid-template-columns: 1fr; }
-@media (min-width: 880px) { .cards { grid-template-columns: 1fr 1fr; align-items: start; } }
+/* Wide screens: two columns, and every card in a section matches the tallest one */
+@media (min-width: 880px) {
+  .cards { grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; }
+  #card-global { grid-column: 1 / -1; }
+  #card-global .fields { grid-template-columns: 1fr 1fr; column-gap: 28px; align-items: start; }
+}
 
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 16px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
   min-width: 0;
 }
+.card .card-foot { margin-top: auto; }
 .card.off .fields { opacity: 0.45; }
 .card-head { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
 .card-head h3 { font-family: var(--font-display); font-weight: 600; font-size: 16px; margin: 0; }
@@ -398,9 +405,9 @@ input[type="color"] { width: 44px; height: 30px; border: 1px solid var(--line); 
 
 <div class="page">
   <header class="intro">
-    <span class="eyebrow">FUTO Tweaks 1.1 · effect lab</span>
-    <h1>FUTO Tweaks Lab</h1>
-    <p>Tune every effect against a mock of FUTO Keyboard. Tap the keyboard button in the corner to bring it up while you scroll, or use Preview on any card. Type, swipe words, hold e or a for accents, drag the spacebar, and hold backspace.</p>
+    <span class="eyebrow">keyfx · effect lab</span>
+    <h1>keyfx Lab</h1>
+    <p>Tune every keyfx effect against a mock of FUTO Keyboard. Tap the keyboard button in the corner to bring it up while you scroll, or use Preview on any card to see that effect on its own. Type, swipe words, hold e or a for accents, drag the spacebar, and hold backspace.</p>
     <div class="intro-actions">
       <button class="btn primary" id="exportBtn" type="button">Export settings</button>
       <button class="btn" id="resetBtn" type="button">Reset to defaults</button>
@@ -444,7 +451,7 @@ input[type="color"] { width: 44px; height: 30px; border: 1px solid var(--line); 
 /* ================================================================
    Settings model
    Values mirror the module's knobs, so an export can be dropped
-   straight into the next FUTO Tweaks build as defaults.
+   straight into a keyfx host (FUTO Tweaks, FXboard) or its defaults.
    ================================================================ */
 const DEFAULTS = {
   global: { accent: '#8AB4F8', kbTheme: 'dark', speed: 1, intensity: 1 },
@@ -485,7 +492,31 @@ try {
 } catch (e) { /* storage blocked: start from defaults */ }
 if (cfg.del.tap === 'crumble') cfg.del.tap = 'shatter'; // renamed in v2
 function save() {
-  try { localStorage.setItem(STORE, JSON.stringify({ cfg, notes })); } catch (e) { /* not persisted */ }
+  try { localStorage.setItem(STORE, JSON.stringify({ cfg: userCfg(), notes })); } catch (e) { /* not persisted */ }
+}
+/* While a preview runs, every other effect is switched off in cfg; isolated holds the user's own on/off values. */
+let isolated = null;
+function userCfg() {
+  if (!isolated) return cfg;
+  const c = clone(cfg);
+  for (const id in isolated) c[id].on = isolated[id];
+  return c;
+}
+// Effects a preview keeps on beside its own, where it has nothing to show by itself
+const PREVIEW_WITH = { pick: ['hop'] };
+function isolate(id) {
+  isolated = {};
+  const keep = [id, ...(PREVIEW_WITH[id] || [])];
+  for (const k in cfg) {
+    if (!('on' in cfg[k])) continue;
+    isolated[k] = cfg[k].on;
+    cfg[k].on = keep.includes(k);
+  }
+}
+function unisolate() {
+  if (!isolated) return;
+  for (const id in isolated) cfg[id].on = isolated[id];
+  isolated = null;
 }
 
 /* Field builders for the settings cards */
@@ -683,7 +714,7 @@ function buildField(id, f) {
 function refreshVisibility(id) {
   for (const { def, el } of fieldRefs[id] || []) el.hidden = def.show ? !def.show(cfg[id]) : false;
   const card = $(`#card-${id}`);
-  if (card && 'on' in cfg[id]) card.classList.toggle('off', !cfg[id].on);
+  if (card && 'on' in cfg[id]) card.classList.toggle('off', !(isolated && id in isolated ? isolated[id] : cfg[id].on));
 }
 
 function changed(id) {
@@ -732,7 +763,11 @@ function buildCard(item) {
   if (!item.noToggle) {
     const on = card.querySelector(`#${id}-on`);
     on.checked = !!c.on;
-    on.addEventListener('change', () => { c.on = on.checked; changed(id); });
+    on.addEventListener('change', () => {
+      if (isolated && id in isolated) isolated[id] = on.checked; // takes effect when the preview ends
+      else c.on = on.checked;
+      changed(id);
+    });
   }
   const fields = card.querySelector('.fields');
   fieldRefs[id] = [];
@@ -851,7 +886,7 @@ function hit(x, y) {
 }
 
 /* ---------- Text field ---------- */
-let text = 'Hey Theo, try swiping a word\nor drag the spacebar up and down.\n', caret = text.length;
+let text = 'Remember Reach. Try swiping a word\nor drag the spacebar up and down.\n', caret = text.length;
 let shift = 0; // 0 off, 1 once, 2 locked
 let lastCommit = null;
 
@@ -909,7 +944,7 @@ function caretPoint() {
 $('#clearField').addEventListener('click', () => { text = ''; caret = 0; renderField(); setSuggestions(['', '', '']); });
 
 /* ---------- Mini swipe decoder and suggestions ---------- */
-const DICT = ('the of and to in is you that it he was for on are as with his they at be this have from or one had by word but not what all were we when your can said there use an each which she do how their if will up other about out many then them these so some her would make like him into time has look two more write go see number no way could people my than first water been call who its now find long down day did get come made may part hello world keyboard theo swipe typing effect effects futo pixel phone great thanks thank good morning night love test testing quick brown fox jumps over lazy dog yes okay sure later today tomorrow tonight here where why because really very just know think want need going still back over home work game games play design designer laser maker space star stars wave ghost fire black hole letter letters magic animation smooth feel nice cool awesome perfect almost little big small sweep shimmer comet stardust trace ring bloom cascade jump hop').split(' ');
+const DICT = ('the of and to in is you that it he was for on are as with his they at be this have from or one had by word but not what all were we when your can said there use an each which she do how their if will up other about out many then them these so some her would make like him into time has look two more write go see number no way could people my than first water been call who its now find long down day did get come made may part hello world keyboard swipe typing effect effects futo pixel phone great thanks thank good morning night love test testing quick brown fox jumps over lazy dog yes okay sure later today tomorrow tonight here where why because really very just know think want need going still back over home work game games play design designer laser maker space star stars wave ghost fire black hole letter letters magic animation smooth feel nice cool awesome perfect almost little big small sweep shimmer comet stardust trace ring bloom cascade jump hop remember reach cowboy talk cheap show code everyone fix own open free software source share').split(' ');
 const collapse = (w) => w.replace(/(.)\1+/g, '$1');
 function subseqCount(word, seq) { // how many leading letters of word appear in order in seq
   let j = 0, n = 0;
@@ -2428,17 +2463,30 @@ async function hideKeyboard() {
 fab.addEventListener('click', () => (kbOpen ? hideKeyboard() : showKeyboard()));
 addEventListener('resize', () => { if (kbOpen) measure(); });
 
-/* Public-domain passage for the hands-free tests (Gettysburg Address, 1863). */
-const PASSAGE = 'Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal.';
+/* Lines for the hands-free tests, one per run in turn. Letters, spaces, commas and periods only, since
+   those are the keys the mock has. */
+const PASSAGES = [
+  'Remember Reach.',
+  'See you later, space cowboy.',
+  'To be, or not to be, that is the question.', // Shakespeare, Hamlet
+  'We know what we are, but know not what we may be.', // Shakespeare, Hamlet
+  'Though she be but little, she is fierce.', // Shakespeare, A Midsummer Night's Dream
+  'Talk is cheap. Show me the code.', // Linus Torvalds
+  'This is for everyone.', // Tim Berners-Lee, on the web
+  'If you cannot fix it, you do not own it.', // the right to repair motto
+];
+let passageAt = 0;
+const nextPassage = () => PASSAGES[passageAt++ % PASSAGES.length];
 
 /* ================================================================
    Previews: scripted touches through the same input path
    ================================================================ */
 const demo = {
   running: false, token: 0,
-  cancel() { this.token++; this.running = false; if (P.active) inUp(); },
+  cancel() { this.token++; this.running = false; if (P.active) inUp(); unisolate(); },
 };
 async function runDemo(kind, id) {
+  demo.cancel();
   // Make sure the effect being previewed is on
   if (id && cfg[id] && 'on' in cfg[id] && !cfg[id].on) {
     cfg[id].on = true;
@@ -2446,16 +2494,25 @@ async function runDemo(kind, id) {
     if (box) box.checked = true;
     changed(id);
   }
-  demo.cancel();
   const my = ++demo.token;
   demo.running = true;
   const alive = () => demo.token === my;
+  // Preview the effect alone; the others come back once its last animation has finished
+  if (id) isolate(id);
+  try {
+    await playDemo(kind, alive);
+    const until = now() + 3000;
+    while (alive() && (FX.length || P.active) && now() < until) await sleep(50);
+  } finally {
+    if (alive()) { unisolate(); demo.running = false; }
+  }
+}
+async function playDemo(kind, alive) {
   if (kind === 'show') {
     await hideKeyboard();
     await sleep(250);
     if (!alive()) return;
     await showKeyboard();
-    demo.running = false;
     return;
   }
   if (!kbOpen) { await showKeyboard(); }
@@ -2496,15 +2553,16 @@ async function runDemo(kind, id) {
   };
   // Hands-free passage: typed key by key, or swiped word by word with punctuation tapped
   const startLine = () => { if (text && !text.endsWith('\n')) insertText('\n'); };
+  const passage = kind.startsWith('sim') ? nextPassage() : '';
   if (kind === 'simType') {
     startLine();
-    for (const ch of PASSAGE) {
+    for (const ch of passage) {
       if (!alive()) break;
       await typeStr(ch, rand(70, 150));
     }
   } else if (kind === 'simSwipe') {
     startLine();
-    for (const token of PASSAGE.split(' ')) {
+    for (const token of passage.split(' ')) {
       if (!alive()) break;
       const m = token.match(/^([A-Za-z]+)([,.]?)$/);
       if (!m) { await typeStr(token + ' ', 90); continue; }
@@ -2519,11 +2577,11 @@ async function runDemo(kind, id) {
     }
   } else if (kind === 'simPaste') {
     startLine();
-    insertText(PASSAGE);
+    insertText(passage);
     typingSuggestions();
   }
   switch (kind) {
-    case 'type': await typeStr('Hey Theo ', 170); break;
+    case 'type': await typeStr('Remember Reach ', 170); break;
     case 'heat': await typeStr('the quick brown fox jumps over ', 55); break;
     case 'enter': await tap(keyOf((k) => k.t === 'enter'), 70, 600); break;
     case 'space': for (let i = 0; i < 3; i++) await tap(keyOf((k) => k.t === 'space'), 70, 450); break;
@@ -2564,14 +2622,13 @@ async function runDemo(kind, id) {
       break;
     }
   }
-  if (alive()) demo.running = false;
 }
 
 /* ================================================================
    Export, reset, boot
    ================================================================ */
 function exportText() {
-  const lines = ['FUTO Tweaks Lab feedback', ''];
+  const lines = ['keyfx Lab feedback', ''];
   const named = {};
   for (const sec of SECTIONS) for (const it of sec.items) named[it.id] = it.name;
   const withNotes = Object.entries(notes).filter(([, v]) => v && v.trim());
@@ -2581,10 +2638,10 @@ function exportText() {
     lines.push('');
   }
   // Only list values that differ from the defaults, then the full set for the module
-  const diff = [];
-  for (const id in cfg) for (const k in cfg[id]) if (JSON.stringify(cfg[id][k]) !== JSON.stringify(DEFAULTS[id][k])) diff.push(`- ${named[id] || id} ${k}: ${DEFAULTS[id][k]} → ${cfg[id][k]}`);
+  const diff = [], mine = userCfg();
+  for (const id in mine) for (const k in mine[id]) if (JSON.stringify(mine[id][k]) !== JSON.stringify(DEFAULTS[id][k])) diff.push(`- ${named[id] || id} ${k}: ${DEFAULTS[id][k]} → ${mine[id][k]}`);
   lines.push(diff.length ? 'Changed from defaults:' : 'No settings changed from defaults.');
-  lines.push(...diff, '', 'Full settings:', JSON.stringify(cfg));
+  lines.push(...diff, '', 'Full settings:', JSON.stringify(userCfg()));
   return lines.join('\n');
 }
 $('#exportBtn').addEventListener('click', () => {
@@ -2607,6 +2664,7 @@ $('#resetBtn').addEventListener('click', (e) => {
   if (!resetArmed) { resetArmed = true; b.textContent = 'Tap again to reset'; setTimeout(() => { resetArmed = false; b.textContent = 'Reset to defaults'; }, 2500); return; }
   resetArmed = false;
   b.textContent = 'Reset to defaults';
+  demo.cancel();
   cfg = clone(DEFAULTS);
   save();
   buildSettings();
