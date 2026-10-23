@@ -6,11 +6,11 @@
 **An effects library for Android keyboards.** Key pops, floating letters, backspace fire and black holes, swipe trails, letter hop, hold charge, a spacebar trackpad and show and hide animations, all drawn by one `Drawable` that any keyboard can host.
 
 > [!NOTE]
-> keyfx, FUTO Tweaks and FXboard are independent, unofficial projects by Theo Erickson. They are not made, endorsed or supported by FUTO.
+> keyfx, FX for FUTO Keyboard and FXboard are independent, unofficial projects by Theo Erickson. They are not made, endorsed or supported by FUTO.
 
 <!-- Media: a short GIF of a few effects in action goes here, e.g. <img src="docs/media/hero.gif" width="360" alt="keyfx effects while typing"> -->
 
-keyfx is the engine behind [FUTO Tweaks](https://github.com/Theo-Erickson/futo-tweaks), and is being built into [FXboard](https://github.com/Theo-Erickson/fxboard).
+keyfx is the engine behind [FX for FUTO Keyboard](https://github.com/Theo-Erickson/futo-tweaks), and is being built into [FXboard](https://github.com/Theo-Erickson/fxboard).
 
 ## Contents
 
@@ -43,7 +43,7 @@ keyfx is a library, so it has no APK of its own. To try the effects on a phone, 
 
 | I want to... | Get this |
 |---|---|
-| Keep the official FUTO Keyboard and add effects (root with LSPosed or Vector) | [FUTO Tweaks releases](https://github.com/Theo-Erickson/futo-tweaks/releases) |
+| Keep the official FUTO Keyboard and add effects (root with LSPosed or Vector) | [FX for FUTO Keyboard releases](https://github.com/Theo-Erickson/futo-tweaks/releases) |
 | Install a standalone keyboard with effects built in (no root; keyfx is still being wired in) | [FXboard releases](https://github.com/Theo-Erickson/fxboard/releases) |
 | Try the effects in a browser and design my own settings | [Open the lab](https://theo-erickson.github.io/keyfx/) (runs in any browser, phone included) |
 | Use keyfx in my own keyboard | [Adding keyfx to a project](#adding-keyfx-to-a-project) |
@@ -71,7 +71,7 @@ When one press removes a whole word (like undoing a swiped word), every letter i
 | Project | What it is | Who it's for | License |
 |---|---|---|---|
 | **keyfx** (this repo) | The effects library | Keyboard developers | Apache-2.0 |
-| [FUTO Tweaks](https://github.com/Theo-Erickson/futo-tweaks) | An unofficial LSPosed / Vector module that adds keyfx to the official FUTO Keyboard app at runtime | Rooted phones that want to keep the official FUTO app and its updates | Apache-2.0 |
+| [FX for FUTO Keyboard](https://github.com/Theo-Erickson/futo-tweaks) | An unofficial LSPosed / Vector module that adds keyfx to the official FUTO Keyboard app at runtime | Rooted phones that want to keep the official FUTO app and its updates | Apache-2.0 |
 | [FXboard](https://github.com/Theo-Erickson/fxboard) | An FX keyboard: a fork of FUTO Keyboard with keyfx built in | Anyone, no root needed | FUTO Source First 1.1 |
 | [FUTO Keyboard](https://keyboard.futo.org) (official) | The offline, private keyboard both apps build on. Not affiliated with these projects | Everyone | FUTO Source First 1.1 |
 
@@ -79,13 +79,13 @@ When one press removes a whole word (like undoing a swiped word), every letter i
 
 The effects were designed in the lab, a mock keyboard in a single HTML file with a slider and a live preview for every setting. **[Open the lab](https://theo-erickson.github.io/keyfx/)** in any desktop or phone browser, or download [`lab/index.html`](lab/index.html) to use it offline.
 
-The lab's section ids and setting keys match keyfx's schema exactly. Press **Export settings** in the lab, then paste the result into a host's **Import** box (FUTO Tweaks and FXboard both have one) to copy your design to your phone. Anything the host doesn't support is skipped.
+The lab's section ids and setting keys match keyfx's schema exactly. Press **Export settings** in the lab, then paste the result into a host's **Import** box (FX for FUTO Keyboard and FXboard both have one) to copy your design to your phone. Anything the host doesn't support is skipped.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-  U["User touches<br/>the keyboard"] --> H["Host keyboard<br/>(e.g. FUTO Tweaks)"]
+  U["User touches<br/>the keyboard"] --> H["Host keyboard<br/>(e.g. FX for FUTO Keyboard)"]
   H -- "events: keyDown, keyTyped,<br/>deleteTap, swipePoint..." --> K["KeyFx Drawable"]
   H -- "setLayout: key rects,<br/>keyboard and suggestion bar" --> K
   P["SharedPreferences<br/>section.field keys"] -- "reload()" --> K
@@ -159,7 +159,7 @@ Then add `keyfx/src/main/java` to your app module's source set, or include it as
 Yes. keyfx is Apache-2.0. Keep the `LICENSE` and `NOTICE` files with your distribution and say what you changed. A credit link back here is appreciated but not required.
 
 **Does keyfx need root or Xposed?**
-No. keyfx is an ordinary library. Root is only needed by FUTO Tweaks, which uses LSPosed to add keyfx to an app it can't rebuild.
+No. keyfx is an ordinary library. Root is only needed by FX for FUTO Keyboard, which uses LSPosed to add keyfx to an app it can't rebuild.
 
 **Does keyfx collect or send any data?**
 No. It has no network code and no analytics. It sees only the events its host gives it and keeps nothing after an effect finishes.
@@ -171,24 +171,24 @@ Effects are drawn with plain `Canvas` calls, and keyfx only redraws while someth
 Hosts like FXboard need to build fully from source with no extra repositories, and subtree keeps the files plainly visible in the host. A published package may come later.
 
 **Why are some settings missing in my app?**
-They need a capability the host doesn't have. For example FUTO Tweaks can't restyle FUTO's suggestion bar, so that setting will only appear in FXboard.
+They need a capability the host doesn't have. For example FX for FUTO Keyboard can't restyle FUTO's suggestion bar, so that setting will only appear in FXboard.
 
 **Is this made by FUTO?**
-No. keyfx, FUTO Tweaks and FXboard are independent projects by Theo Erickson, and are not affiliated with or endorsed by FUTO.
+No. keyfx, FX for FUTO Keyboard and FXboard are independent projects by Theo Erickson, and are not affiliated with or endorsed by FUTO.
 
 **Where do I report a bug?**
-Effect bugs (drawing, timing, settings) go in [keyfx issues](https://github.com/Theo-Erickson/keyfx/issues). Problems with hooking FUTO go to [FUTO Tweaks](https://github.com/Theo-Erickson/futo-tweaks/issues), and problems with the fork to [FXboard](https://github.com/Theo-Erickson/fxboard/issues). Please don't report any of them to FUTO.
+Effect bugs (drawing, timing, settings) go in [keyfx issues](https://github.com/Theo-Erickson/keyfx/issues). Problems with hooking FUTO go to [FX for FUTO Keyboard](https://github.com/Theo-Erickson/futo-tweaks/issues), and problems with the fork to [FXboard](https://github.com/Theo-Erickson/fxboard/issues). Please don't report any of them to FUTO.
 
 ## Support
 
-keyfx is free and always will be. If you enjoy the effects, in any app that uses them, you can support keyfx on [Ko-fi](https://ko-fi.com/theoerickson). Donations go to keyfx, the library, and to FUTO Tweaks, which is also Apache-2.0. FXboard, as a fork of FUTO Keyboard, takes no donations itself.
+keyfx is free and always will be. If you enjoy the effects, in any app that uses them, you can support keyfx on [Ko-fi](https://ko-fi.com/theoerickson). Donations go to keyfx, the library, and to FX for FUTO Keyboard, which is also Apache-2.0. FXboard, as a fork of FUTO Keyboard, takes no donations itself.
 
 ## Licensing
 
 ```mermaid
 flowchart LR
   K["keyfx<br/>effects library<br/>Apache-2.0 + NOTICE"]
-  T["FUTO Tweaks<br/>unofficial Vector/LSPosed module<br/>Apache-2.0"]
+  T["FX for FUTO Keyboard<br/>unofficial Vector/LSPosed module<br/>Apache-2.0"]
   F["FXboard<br/>fork of FUTO Keyboard<br/>FUTO Source First 1.1"]
   U["FUTO Keyboard (official)<br/>FUTO Source First 1.1"]
   K -- "git subtree" --> T
@@ -200,9 +200,9 @@ flowchart LR
 | Project | License | Notes |
 |---|---|---|
 | keyfx | Apache-2.0 | Ship the `NOTICE` file with any distribution. |
-| FUTO Tweaks | Apache-2.0 | Contains no FUTO code; it hooks the official app at runtime. |
+| FX for FUTO Keyboard | Apache-2.0 | Contains no FUTO code; it hooks the official app at runtime. |
 | FXboard | FUTO Source First 1.1 | The fork as a whole. The `keyfx/` folder inside it keeps its Apache-2.0 license and NOTICE. |
 
 keyfx is licensed under the [Apache License 2.0](LICENSE). Copyright 2026 Theo Erickson.
 
-keyfx, FUTO Tweaks and FXboard are not affiliated with or endorsed by FUTO. FUTO and FUTO Keyboard are trademarks of FUTO Holdings, Inc., named here only to describe which keyboard the other projects work with. These projects claim no rights to them.
+keyfx, FX for FUTO Keyboard and FXboard are not affiliated with or endorsed by FUTO. FUTO and FUTO Keyboard are trademarks of FUTO Holdings, Inc., named here only to describe which keyboard the other projects work with. These projects claim no rights to them.
