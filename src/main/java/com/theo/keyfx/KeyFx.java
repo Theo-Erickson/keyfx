@@ -228,6 +228,35 @@ public final class KeyFx extends Drawable {
         if (host != null) host.wordChanged();
     }
 
+    /**
+     * Where to put n accents for a long press on k (hosts with CAP_POPUP_LAYOUT). With the bloom
+     * layout, fills outXY with each accent's center (x0, y0, x1, y1, ...) inside bounds and returns
+     * true; returns false for the row layout, meaning the host lays it out as usual.
+     */
+    public boolean popupLayout(FxKey k, int n, RectF bounds, float[] outXY) {
+        if (!enabled || k == null || n <= 0 || outXY.length < 2 * n || !"bloom".equals(settings.s("popup", "style"))) return false;
+        Fx.popupArc(k.cx(), k.cy(), n, dp(settings.f("popup", "radius")), bounds.left + dp(22),
+                bounds.right - dp(22), bounds.top + dp(26), outXY);
+        return true;
+    }
+
+    /**
+     * How accent i of a bloom popup looks msSinceOpen after it opened: it flies out from the key
+     * center (keyCx, keyCy) to its place (itemX, itemY), growing and fading in. Returns false once
+     * it has settled.
+     */
+    public boolean popupLook(int i, long msSinceOpen, float keyCx, float keyCy, float itemX, float itemY, KeyLook out) {
+        out.reset();
+        if (!enabled) return false;
+        final float u = (msSinceOpen - D(22 * i)) / D(220);
+        if (u >= 1) return false;
+        final float p = Fx.clamp01(u), e = Fx.easeOutBack(p);
+        out.scaleBy(0.3f + 0.7f * e);
+        out.fade(p);
+        out.move((keyCx - itemX) * (1 - e), (keyCy - itemY) * (1 - e));
+        return true;
+    }
+
     /** Drops every running effect, for example when the keyboard hides. */
     public void reset() {
         effects.clear();
@@ -600,12 +629,22 @@ public final class KeyFx extends Drawable {
     }
 
     /**
+     * False when the show animation moves the real keys itself through look() (hosts with
+     * CAP_KEY_TRANSFORM and "Animate each key" on): call show(null, onDone) and keep the view
+     * visible; onDone still runs when the keys settle.
+     */
+    public boolean showNeedsSnapshot() {
+        return (caps & CAP_KEY_TRANSFORM) == 0 || !settings.b("show", "perKey");
+    }
+
+    /**
      * The keyboard appeared. snapshot shows the keyboard view (layout.keyboard exactly). If a
-     * module animates it, the host should hide the real view until onDone runs, and the call
+     * module animates it, the host should (when it passed a snapshot) hide the real view until onDone runs, and the call
      * returns true. Otherwise the snapshot is recycled and the call returns false.
+     * With a null snapshot (see showNeedsSnapshot) the keys animate through look() instead.
      */
     public boolean show(Bitmap snapshot, Runnable onDone) {
-        if (enabled && snapshot != null) {
+        if (enabled && (snapshot != null || !showNeedsSnapshot())) {
             for (FxModule m : modules) {
                 try {
                     if (m.onShow(snapshot, onDone)) return true;

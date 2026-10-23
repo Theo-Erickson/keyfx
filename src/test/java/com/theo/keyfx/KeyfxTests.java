@@ -82,7 +82,8 @@ public final class KeyfxTests {
     // region Lit letters
 
     static void litLettersCounts() {
-        check(Fx.litLetters("hello", "hgfdsewrtyuiklo") == 4, "doubled letters count once: h, e, l, o");
+        check(Fx.litLetters("hello", "hgfdsewrtyuiklo") == 5, "raw letters: the doubled l lights with the first");
+        check(Fx.litLetters("hello", "hel") == 4, "h, e, l, l lit; o not");
         check(Fx.litLetters("world", "wer") == 1, "stops at the first letter not crossed");
         check(Fx.litLetters("Hello", "h") == 1, "case doesn't matter");
         check(Fx.litLetters("", "abc") == 0 && Fx.litLetters(null, "abc") == 0, "no guess, nothing lit");

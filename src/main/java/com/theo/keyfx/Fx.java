@@ -104,8 +104,10 @@ public final class Fx {
     }
 
     /**
-     * How many leading letters of the guessed word the swipe has crossed, in order, ignoring
-     * case and counting a doubled letter once. Matches the lab's subseqCount(collapse(word), seq).
+     * How many leading letters of the guessed word are lit by the swipe, counting raw letters and
+     * ignoring case. A letter that repeats the one before it is lit exactly when that one was;
+     * any other letter must be crossed, in order, after the previous crossing. Matches the lab's
+     * litLetters(word, seq).
      */
     public static int litLetters(String guess, String crossed) {
         if (guess == null || crossed == null) return 0;
@@ -114,7 +116,10 @@ public final class Fx {
         for (int i = 0; i < g.length(); ) {
             final int cp = g.codePointAt(i);
             i += Character.charCount(cp);
-            if (cp == prev) continue;
+            if (cp == prev) {
+                n++; // the previous letter was lit, or we would have stopped
+                continue;
+            }
             prev = cp;
             final int at = seq.indexOf(cp, from);
             if (at < 0) break;

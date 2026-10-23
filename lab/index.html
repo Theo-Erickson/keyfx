@@ -464,7 +464,7 @@ const DEFAULTS = {
   enter: { on: true, duration: 380, width: 30, strength: 1 },
   space: { on: true, mode: 'stars', count: 9, spread: 1, life: 760, strength: 1 },
   del: { on: true, tap: 'fire', letterFx: true, fireHeight: 1, fireCount: 22, fireLife: 620, slashSpeed: 70, slashOver: 0.25, slashTilt: 15, shards: 8, strength: 1 },
-  delHold: { on: true, button: 'blackhole', letters: 'swirl', flight: 1100, offset: 0, size: 34, swirl: 1, strength: 1 },
+  delHold: { on: true, button: 'blackhole', letters: 'swirl', flight: 1100, offset: 0, size: 34, swirl: 1, shake: true, strength: 1 },
   futoTrail: { on: true },
   trace: { on: true, color: 'accent', custom: '#FF8A3D', duration: 620, strength: 1 },
   comet: { on: false, length: 260, width: 7, hue: 60, strength: 1 },
@@ -477,7 +477,8 @@ const DEFAULTS = {
   ring: { on: true, style: 'liquid', timeout: 300, appear: 35, thickness: 3, wave: 3, strength: 1 },
   popup: { style: 'bloom', radius: 70 },
   trackpad: { on: true, dim: 0.6, labels: 0.85, grid: 0.35, halo: 26, strength: 1 },
-  show: { mode: 'bloom', duration: 320, stagger: 40, overshoot: 1.2 },
+  // perKey only matters on the phone (snapshot vs real keys); the lab always animates key by key
+  show: { mode: 'bloom', duration: 320, stagger: 40, overshoot: 1.2, perKey: true },
   hide: { mode: 'dip', duration: 160 },
 };
 
@@ -574,7 +575,8 @@ const SECTIONS = [
       R('flight', 'Letter travel time', 300, 2400, 10, 'ms', (c) => c.letters !== 'press'),
       R('offset', 'Black hole position, key to center', 0, 1, 0.01, '', (c) => c.button === 'blackhole'),
       R('size', 'Black hole size', 16, 60, 1, 'dp', (c) => c.button === 'blackhole'),
-      R('swirl', 'Swirl speed', 0.2, 3, 0.05, '×', (c) => c.letters === 'swirl'), STR] },
+      R('swirl', 'Swirl speed', 0.2, 3, 0.05, '×', (c) => c.letters === 'swirl'),
+      T('shake', 'Shake the key', (c) => c.button === 'lava'), STR] },
   ] },
   { title: 'Swipe trail', blurb: 'Drawn along your finger while swiping a word. Several can run at once.', items: [
     { id: 'futoTrail', name: 'FUTO\'s own trail', desc: 'The thin line FUTO already draws. Turn it off to judge the others alone.', demo: 'swipe', fields: [] },
@@ -617,7 +619,8 @@ const SECTIONS = [
   { title: 'Keyboard show and hide', blurb: 'Plays when the keyboard appears and goes away.', items: [
     { id: 'show', name: 'Show animation', tag: 'new', noToggle: true, desc: 'Center bloom pops the keys in from the middle outward. Row cascade raises the rows from the bottom.', demo: 'show', fields: [
       C('mode', 'Style', [['bloom', 'Center bloom'], ['cascade', 'Row cascade'], ['none', 'None']]),
-      R('duration', 'Duration', 120, 900, 10, 'ms'), R('stagger', 'Stagger', 0, 120, 1, 'ms'), R('overshoot', 'Overshoot', 0, 3, 0.05, '×')] },
+      R('duration', 'Duration', 120, 900, 10, 'ms'), R('stagger', 'Stagger', 0, 120, 1, 'ms'), R('overshoot', 'Overshoot', 0, 3, 0.05, '×'),
+      T('perKey', 'Animate each key', (c) => c.mode !== 'none')] },
     { id: 'hide', name: 'Hide animation', noToggle: true, desc: 'Android runs the real hide, so this can only be a quick moment before the slide.', demo: 'show', fields: [
       C('mode', 'Style', [['dip', 'Dip'], ['none', 'None']]), R('duration', 'Duration', 80, 500, 10, 'ms')] },
   ] },
@@ -957,6 +960,18 @@ const collapse = (w) => w.replace(/(.)\1+/g, '$1');
 function subseqCount(word, seq) { // how many leading letters of word appear in order in seq
   let j = 0, n = 0;
   for (const ch of word) {
+    const at = seq.indexOf(ch, j);
+    if (at < 0) break;
+    j = at + 1;
+    n++;
+  }
+  return n;
+}
+function litLetters(word, seq) { // raw letters lit: a repeat of the previous letter is lit when that one was
+  let j = 0, n = 0, prev = null;
+  for (const ch of word) {
+    if (ch === prev) { n++; continue; }
+    prev = ch;
     const at = seq.indexOf(ch, j);
     if (at < 0) break;
     j = at + 1;
@@ -1631,7 +1646,7 @@ function drawHold(h, t) {
     const amp = Math.min(3.5, held / 350);
     h.jx = rand(-amp, amp);
     h.jy = rand(-amp, amp) * 0.6;
-    k.el.style.transform = `translate(${h.jx}px, ${h.jy}px)`;
+    if (c.shake) k.el.style.transform = `translate(${h.jx}px, ${h.jy}px)`;
   }
   switch (h.button) {
     case 'blackhole': drawBlackHole(T.x, T.y, lerp(7, c.size, grow) * (1 - easeIn(closing)), t, s); break;
@@ -2378,7 +2393,7 @@ function swipeMove(x, y) {
   if (mode === 'all') pickKey(k);
   const seq = P.crossed.map((c) => c.c).join('');
   const live = decode(seq, false);
-  setSuggestions(live, live[0] ? subseqCount(collapse(live[0]), seq) : 0);
+  setSuggestions(live, live[0] ? litLetters(live[0], seq) : 0);
 }
 /** Letters under the points where the finger path turns by more than about 55 degrees. */
 function pathCorners() {
