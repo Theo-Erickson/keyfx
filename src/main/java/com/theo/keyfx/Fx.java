@@ -1,5 +1,7 @@
 package com.theo.keyfx;
 
+import java.util.Locale;
+
 /** Easing, color and math helpers shared by every effect. */
 public final class Fx {
     private Fx() {}
@@ -85,6 +87,41 @@ public final class Fx {
         final float v = l + s * Math.min(l, 1 - l);
         final float sv = v == 0 ? 0 : 2 * (1 - l / v);
         return hsv(h, sv, v);
+    }
+
+    /**
+     * The bloom accent popup: n points fanned out on an arc above (cx, cy), written to out as
+     * x0, y0, x1, y1 and so on (out needs 2n floats), kept between minX and maxX and never
+     * above minY (screen y grows down). Matches the lab.
+     */
+    public static void popupArc(float cx, float cy, int n, float radius, float minX, float maxX, float minY, float[] out) {
+        final double span = Math.min(Math.PI * 0.95, 0.42 * n);
+        for (int i = 0; i < n; i++) {
+            final double a = -Math.PI / 2 - span / 2 + (n == 1 ? span / 2 : span * i / (n - 1));
+            out[i * 2] = clamp(cx + (float) Math.cos(a) * radius, minX, maxX);
+            out[i * 2 + 1] = Math.max(minY, cy + (float) Math.sin(a) * radius);
+        }
+    }
+
+    /**
+     * How many leading letters of the guessed word the swipe has crossed, in order, ignoring
+     * case and counting a doubled letter once. Matches the lab's subseqCount(collapse(word), seq).
+     */
+    public static int litLetters(String guess, String crossed) {
+        if (guess == null || crossed == null) return 0;
+        final String g = guess.toLowerCase(Locale.ROOT), seq = crossed.toLowerCase(Locale.ROOT);
+        int from = 0, n = 0, prev = -1;
+        for (int i = 0; i < g.length(); ) {
+            final int cp = g.codePointAt(i);
+            i += Character.charCount(cp);
+            if (cp == prev) continue;
+            prev = cp;
+            final int at = seq.indexOf(cp, from);
+            if (at < 0) break;
+            from = at + Character.charCount(cp);
+            n++;
+        }
+        return n;
     }
 
     /** Parses "#RRGGBB" or "#AARRGGBB"; returns fallback when it can't. */
