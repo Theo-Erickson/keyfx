@@ -11,8 +11,8 @@ import android.graphics.Shader;
 import java.util.ArrayList;
 
 /**
- * Holding backspace, in two layers: what the key turns into while held (black hole, lava,
- * a box that opens, a hole it fades into), and how each deleted letter gets to it.
+ * Holding backspace, in two layers: what the key turns into while held (black hole, lava, portal,
+ * a box that opens, a hole it fades into), and how each deleted letter gets to it (swirl, vacuum curves, tractor beam, or one press each).
  */
 final class DeleteHoldFx extends FxModule {
 
@@ -54,8 +54,8 @@ final class DeleteHoldFx extends FxModule {
         long end, lastLaunch;
         float jx, jy;
         final ArrayList<Flying> parts = new ArrayList<>();
-        final ArrayList<float[]> bubbles = new ArrayList<>(); // x, y, r, t0, speed
-        final ArrayList<float[]> motes = new ArrayList<>(); // angle, distance, t0
+        final ArrayList<float[]> bubbles = new ArrayList<>(); // x, y, r, t0 (since hold start), speed
+        final ArrayList<float[]> motes = new ArrayList<>(); // angle, distance, t0 (since hold start)
 
         Hold(FxKey k) {
             this.k = k;
@@ -120,7 +120,7 @@ final class DeleteHoldFx extends FxModule {
                     sc = 1 - 0.7f * p;
                     rot = (float) Math.sin(u * 14) * 0.2f;
                     final float nx = -(ty - q.sy), ny = tx - q.sx;
-                    final float nl = (float) Math.hypot(nx, ny) == 0 ? 1 : (float) Math.hypot(nx, ny);
+                    final float hy = (float) Math.hypot(nx, ny), nl = hy == 0 ? 1 : hy;
                     final float wv = fx.dp(14 * (1 - p) + 3);
                     final Path cone = fx.path();
                     cone.moveTo(tx, ty);
@@ -159,9 +159,9 @@ final class DeleteHoldFx extends FxModule {
         /** Portal: spinning rings around a glowing center, with motes pulled inward. */
         private void drawPortal(Canvas c, float x, float y, float r, long t, float s) {
             if (r <= fx.dp(0.5f)) return;
-            final float spin = t / 400f;
+            final float spin = (t - start) / 400f;
             if (end == 0 && fx.rnd.nextFloat() < 0.5f) {
-                motes.add(new float[] { fx.rand(0, (float) Math.PI * 2), r * 2.4f, t });
+                motes.add(new float[] { fx.rand(0, (float) Math.PI * 2), r * 2.4f, t - start });
             }
             final Paint g = fx.fill(0xFFFFFFFF);
             g.setShader(new RadialGradient(x, y, r,
@@ -178,7 +178,7 @@ final class DeleteHoldFx extends FxModule {
             final Paint dot = fx.fill(0xFFFFFFFF);
             for (int i = 0; i < motes.size(); i++) {
                 final float[] m = motes.get(i);
-                final float u = (t - m[2]) / 700f;
+                final float u = ((t - start) - m[2]) / 700f;
                 if (u >= 1) {
                     motes.remove(i);
                     i--;
@@ -193,7 +193,7 @@ final class DeleteHoldFx extends FxModule {
 
         private void drawBlackHole(Canvas c, float x, float y, float r, long t, float s) {
             if (r <= fx.dp(0.5f)) return;
-            final float spin = t / 1000f * 3 * fx.settings.f("delHold", "swirl");
+            final float spin = (t - start) / 1000f * 3 * fx.settings.f("delHold", "swirl");
             c.save();
             c.translate(x, y);
             // Accretion disk: tilted rings rotating around the core
@@ -228,12 +228,12 @@ final class DeleteHoldFx extends FxModule {
             c.drawRect(k.left, k.top, k.right, k.bottom, g);
             if (end == 0 && fx.rnd.nextFloat() < 0.35f * I) {
                 bubbles.add(new float[] { fx.rand(k.left + fx.dp(5), k.right - fx.dp(5)), k.bottom,
-                        fx.dp(fx.rand(1.5f, 4)), t, fx.dp(fx.rand(20, 45)) });
+                        fx.dp(fx.rand(1.5f, 4)), t - start, fx.dp(fx.rand(20, 45)) });
             }
             final Paint ring = fx.stroke(Fx.alpha(0xFFFFE696, 0.8f * I * s), fx.dp(1));
             for (int i = 0; i < bubbles.size(); i++) {
                 final float[] b = bubbles.get(i);
-                final float y = b[1] - b[4] * (t - b[3]) / 1000f;
+                final float y = b[1] - b[4] * ((t - start) - b[3]) / 1000f;
                 if (y < k.top + fx.dp(4)) {
                     bubbles.remove(i);
                     i--;
