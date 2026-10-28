@@ -268,14 +268,14 @@ public final class KeyFx extends Drawable {
 
     /**
      * Where to put n accents for a long press on k (hosts with CAP_POPUP_LAYOUT). With the bloom
-     * layout, fills outXY with each accent's center (x0, y0, x1, y1, ...) inside bounds and returns
-     * true; returns false for the row layout, meaning the host lays it out as usual.
+     * layouts (bloom, wheel, column, grid), fills outXY with each accent's center (x0, y0, x1, y1,
+     * ...) inside bounds and returns true; returns false for the row layout, meaning the host lays
+     * it out as usual.
      */
     public boolean popupLayout(FxKey k, int n, RectF bounds, float[] outXY) {
-        if (!enabled || k == null || n <= 0 || outXY.length < 2 * n || !"bloom".equals(settings.s("popup", "style"))) return false;
-        Fx.popupArc(k.cx(), k.cy(), n, dp(settings.f("popup", "radius")), bounds.left + dp(22),
-                bounds.right - dp(22), bounds.top + dp(26), outXY);
-        return true;
+        if (!enabled || k == null || n <= 0 || outXY.length < 2 * n) return false;
+        return Fx.popupLayout(settings.s("popup", "style"), k.cx(), k.cy(), k.top, n, dp(settings.f("popup", "radius")),
+                bounds.left, bounds.top, bounds.right, bounds.bottom, dp(1), outXY);
     }
 
     /**

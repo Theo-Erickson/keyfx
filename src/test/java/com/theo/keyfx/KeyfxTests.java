@@ -11,6 +11,10 @@ public final class KeyfxTests {
         popupArcSingle();
         popupArcThree();
         popupArcClamps();
+        popupLayoutsStayInside();
+        popupColumnStacksUp();
+        popupWheelAndGridShape();
+        popupLayoutsScaleWithDensity();
         litLettersCounts();
         migrates();
         comboCrossesTen();
@@ -87,6 +91,65 @@ public final class KeyfxTests {
         final float[] out = new float[6];
         Fx.popupArc(10, 40, 3, 70, 22, 378, 26, out);
         for (int i = 0; i < 3; i++) check(out[i * 2] >= 22 && out[i * 2 + 1] >= 26, "accent " + i + " stays inside");
+    }
+
+    // endregion
+
+    // region Popup layouts
+
+    static void popupLayoutsStayInside() {
+        final String[] styles = { "bloom", "wheel", "column", "grid" };
+        final float[][] keys = { { 200, 700 }, { 20, 100 }, { 380, 760 }, { 200, 400 } };
+        for (String style : styles) {
+            for (float[] key : keys) {
+                for (int n = 1; n <= 9; n++) {
+                    final float[] out = new float[2 * n];
+                    check(Fx.popupLayout(style, key[0], key[1] - 20, key[1] - 20, n, 70, 0, 0, 400, 800, 1, out),
+                            style + " lays out " + n);
+                    for (int i = 0; i < n; i++) {
+                        final String what = style + " n=" + n + " accent " + i + " inside the bounds";
+                        check(out[i * 2] >= 22 && out[i * 2] <= 378, what + " (x " + out[i * 2] + ")");
+                        check(out[i * 2 + 1] >= 26 && out[i * 2 + 1] <= 774, what + " (y " + out[i * 2 + 1] + ")");
+                    }
+                }
+            }
+        }
+        check(!Fx.popupLayout("row", 200, 300, 280, 3, 70, 0, 0, 400, 800, 1, new float[6]), "row is left to the host");
+    }
+
+    static void popupColumnStacksUp() {
+        final float[] out = new float[6];
+        Fx.popupLayout("column", 200, 700, 680, 3, 70, 0, 0, 400, 800, 1, out);
+        check(near(out[0], 200) && near(out[2], 200) && near(out[4], 200), "column keeps the key's x");
+        check(near(out[1], 654) && near(out[3], 614) && near(out[5], 574), "column steps up 40 from the key, nearest first");
+    }
+
+    static void popupLayoutsScaleWithDensity() {
+        // At 2 px per dp the margins and spacings double, and every layout still stays inside
+        final String[] styles = { "bloom", "wheel", "column", "grid" };
+        for (String style : styles) {
+            for (int n = 1; n <= 9; n++) {
+                final float[] out = new float[2 * n];
+                Fx.popupLayout(style, 40, 1500, 1480, n, 140, 0, 0, 800, 1600, 2, out);
+                for (int i = 0; i < n; i++) {
+                    check(out[i * 2] >= 44 && out[i * 2] <= 756, style + " n=" + n + " x " + out[i * 2] + " inside at 2x");
+                    check(out[i * 2 + 1] >= 52 && out[i * 2 + 1] <= 1548, style + " n=" + n + " y " + out[i * 2 + 1] + " inside at 2x");
+                }
+            }
+        }
+        final float[] col = new float[4];
+        Fx.popupLayout("column", 400, 700, 680, 2, 140, 0, 0, 800, 1600, 2, col);
+        check(near(col[1], 628) && near(col[3], 548), "column spacing doubles at 2x");
+    }
+
+    static void popupWheelAndGridShape() {
+        final float[] out = new float[8];
+        Fx.popupLayout("wheel", 200, 400, 380, 4, 70, 0, 0, 400, 800, 1, out);
+        check(near(out[0], 200) && near(out[1], 330), "wheel starts at the top");
+        check(near(out[2], 270) && near(out[3], 400), "wheel goes clockwise");
+        Fx.popupLayout("grid", 200, 400, 380, 4, 70, 0, 0, 400, 800, 1, out);
+        check(near(out[0], out[2] - 42) && near(out[1], out[3]), "grid fills a row left to right");
+        check(near(out[5] - out[1], 42) && near(out[0], out[4]), "grid has a second row below the first");
     }
 
     // endregion
