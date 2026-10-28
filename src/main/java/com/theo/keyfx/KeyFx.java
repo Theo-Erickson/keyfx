@@ -145,7 +145,7 @@ public final class KeyFx extends Drawable {
     public KeyFx(float density, SharedPreferences prefs, int caps) {
         this.density = density;
         this.caps = caps;
-        this.settings = new FxSettings(prefs, schema());
+        this.settings = new FxSettings(prefs, schema(), caps);
         this.modules = Modules.create(this);
         fill.setStyle(Paint.Style.FILL);
         stroke.setStyle(Paint.Style.STROKE);
@@ -660,6 +660,18 @@ public final class KeyFx extends Drawable {
         for (FxModule m : modules) {
             try {
                 m.onCursorMove(x, y);
+            } catch (Throwable e) {
+                fail(m, e);
+            }
+        }
+    }
+
+    /** The cursor moved dx characters or dy lines while the spacebar is a trackpad. */
+    public void cursorStep(int dx, int dy) {
+        if (!enabled) return;
+        for (FxModule m : modules) {
+            try {
+                m.onCursorStep(dx, dy);
             } catch (Throwable e) {
                 fail(m, e);
             }

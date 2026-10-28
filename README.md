@@ -117,6 +117,7 @@ fx.longPressStart(FxKey k, float x, long timeoutMs); fx.longPressEnd();
 fx.swipeStart(); fx.swipePoint(float x, float y, long t); fx.swipeEnd(); fx.swipeWord(String word); fx.swipeCancel();
 fx.swipeGuess(String word);             // live best guess during a swipe, for the word highlight
 fx.cursorMode(boolean on, float x, float y); fx.cursorMove(float x, float y);
+fx.cursorStep(int dx, int dy);          // trackpad: each real cursor move, for stepping effects
 fx.show(Bitmap snapshot, Runnable onDone);  // returns true if animating; host hides its view until onDone
 fx.hide(Bitmap snapshot, Runnable onDone);  // CAP_HIDE_ANIMATION hosts only
 
@@ -135,7 +136,7 @@ KeyFx.capTitle(int cap); KeyFx.capReason(int cap);  // wording for settings scre
 1. **Attach.** Create a `KeyFx` and add it to an overlay that covers the keyboard window.
 2. **Layout.** Build an `FxLayout` of `FxKey`s in the Drawable's coordinates, with the keyboard and suggestion bar rectangles, and call `setLayout()` whenever the keyboard changes (new layout, rotation, symbols page).
 3. **Events.** Call the event methods from the points where your keyboard handles touches, typed keys, backspace and swipes.
-4. **Private fields.** When input starts, call `setPrivateField(KeyFx.isPrivateInput(editorInfo.inputType))`. In password fields, shown or hidden, keyfx then draws nothing, so no effect gives away what is typed. Check `isEnabled()` before reading the app's text for backspace effects, so nothing is read there either.
+4. **Private fields.** When input starts, call `setPrivateField(KeyFx.isPrivateInput(editorInfo.inputType))`. In password fields, shown or hidden, keyfx then draws nothing, so no effect gives away what is typed. Check `isEnabled()` before reading the app's text for backspace effects, so nothing is read there either. A choice value can need a capability too (`Field.valueRequires`); hosts without it don't offer that value, and a saved one reads as the default.
 5. **Capabilities.** Declare what your host can do beyond drawing on top, with the `KeyFx.CAP_*` flags. Settings and sections that need a missing flag are hidden from that host's settings screen.
 
    | Flag | Lets keyfx |

@@ -169,7 +169,8 @@ final class HoldFx extends FxModule {
 
     @Override
     public boolean drawUnder(Canvas c, long t) {
-        final float dt = last != 0 ? t - last : 0;
+        // The first frame of a fade counts as one frame, and a pause can't make it jump
+        final float dt = last != 0 ? Math.min(64, t - last) : 16;
         last = t;
         level = level < target ? Math.min(1, level + dt / 150) : Math.max(target, level - dt / 200);
         if (level <= 0 && target <= 0) {

@@ -141,4 +141,27 @@ public final class Fx {
             return fallback;
         }
     }
+
+    // Values removed from the schema, mapped to what replaced them: "section.key" -> {old, new, ...}
+    private static final String[][] MIGRATE = {
+            { "float.mode", "grow", "rise" },
+            { "del.tap", "eraser", "fire" },
+            { "hop.word", "merge", "join", "magnet", "join" },
+            { "delHold.button", "storm", "blackhole", "magnet", "blackhole" },
+            { "trackpad.look", "grid", "rails" },
+    };
+
+    /** Maps a saved value of a removed choice onto what replaced it; other values pass through. */
+    public static String migrate(String key, String value) {
+        for (String[] m : MIGRATE) {
+            if (!m[0].equals(key)) continue;
+            for (int i = 1; i + 1 < m.length; i += 2) if (m[i].equals(value)) return m[i + 1];
+        }
+        return value;
+    }
+
+    /** The combo counter flashes when a hit carries it across a multiple of ten (a swipe can skip past it). */
+    public static boolean crossesTen(int before, int after) {
+        return after / 10 > before / 10;
+    }
 }

@@ -11,6 +11,8 @@ public final class KeyfxTests {
         popupArcThree();
         popupArcClamps();
         litLettersCounts();
+        migrates();
+        comboCrossesTen();
         if (failed > 0) {
             System.out.println(failed + " failed");
             System.exit(1);
@@ -100,6 +102,21 @@ public final class KeyfxTests {
         } finally {
             java.util.Locale.setDefault(saved);
         }
+    }
+
+    static void migrates() {
+        check("rise".equals(Fx.migrate("float.mode", "grow")), "grow float becomes rise");
+        check("join".equals(Fx.migrate("hop.word", "magnet")), "magnet hop becomes join");
+        check("blackhole".equals(Fx.migrate("delHold.button", "storm")), "storm becomes black hole");
+        check("rails".equals(Fx.migrate("trackpad.look", "grid")), "the moving grid becomes rails");
+        check("ghost".equals(Fx.migrate("float.mode", "ghost")), "current values are kept");
+    }
+
+    static void comboCrossesTen() {
+        check(Fx.crossesTen(9, 10), "9 to 10 flashes");
+        check(Fx.crossesTen(8, 13), "a swiped word jumping past 10 flashes");
+        check(!Fx.crossesTen(10, 11), "11 doesn't flash");
+        check(Fx.crossesTen(19, 20) && !Fx.crossesTen(20, 20), "20 flashes once");
     }
 
     // endregion
