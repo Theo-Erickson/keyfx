@@ -59,12 +59,15 @@ final class SwipeWordFx extends FxModule {
         float fromX, fromY, x, y;
         long t0;
         float vx, spin, ph; // precomputed drift, tumble and wobble phase
+        String wg; // the word's glyph this letter stands for
         int wi = -1; // index in the formed word, or -1 for an extra letter
         int order; // position among the word's letters, or among the extras
         boolean embers, landed, dusted, clacked;
     }
 
-    private static final int GREY = 0xFFAEB3BE;
+    private int grey() {
+        return Fx.mix(fx.labelColor(), fx.keyFill(), 0.35f);
+    }
 
     private static float easeOutBounce(float x) {
         x = Fx.clamp01(x);
@@ -91,6 +94,7 @@ final class SwipeWordFx extends FxModule {
         int wordCount, wordLetters;
         long exitAt;
         float textX, textY;
+        float[] wordAt = new float[2];
 
         Hop(FxKey[] row) {
             this.row = row;
@@ -147,7 +151,6 @@ final class SwipeWordFx extends FxModule {
                 // A short streak behind it
                 final float bp = Fx.easeOut(Math.max(0, p - 0.3f));
                 final Paint sp = fx.stroke(Fx.alpha(fx.accent(), 0.5f * (1 - p) * s), fx.dp(3));
-                sp.setStrokeCap(Paint.Cap.ROUND);
                 c.drawLine(Fx.lerp(l.fromX, tx, bp), Fx.lerp(l.fromY, ty, bp), x, y, sp);
             } else {
                 x = Fx.lerp(l.fromX, tx, ep);
@@ -163,21 +166,21 @@ final class SwipeWordFx extends FxModule {
         boolean exitLetter(Canvas c, HopLetter l, long t, float s) {
             if (l.wi < 0) return exitExtra(c, l, t, s);
             final boolean together = "join".equals(wordMode), typed = "type".equals(wordMode);
-            final float start = exitAt + fx.D(mark ? 200 : 80) + (together ? 0 : l.order * fx.D(typed ? 90 : 40));
-            final float e = t - start;
+            final float delay = fx.D(mark ? 200 : 80) + (together ? 0 : l.order * fx.D(typed ? 90 : 40));
+            final float e = (t - exitAt) - delay;
             if (e < 0) {
                 fx.glowText(c, l.g, l.x, l.y, 20, 1.08f, s, fx.accent(), 0);
                 return true;
             }
-            final float[] wp = wordPoint();
+            final float[] wp = wordAt;
             final float ty = wp[1];
             final int m = wordCount;
             if ("text".equals(wordMode)) {
                 // Each letter flies to its own spot in the text it just became
                 final float u = e / fx.D(480);
                 if (u >= 1) return false;
-                final float p = Fx.easeOut(u), tx = textX - (m + 0.5f - l.wi) * fx.dp(8.5f);
-                fx.glowText(c, glyphAt(word, l.wi), Fx.lerp(l.x, tx, p), Fx.lerp(l.y, textY, p) - fx.dp(50) * (float) Math.sin(Math.PI * p),
+                final float p = Fx.easeOut(u), tx = textX + (l.wi - (m - 1) / 2f) * fx.dp(8.5f);
+                fx.glowText(c, l.wg, Fx.lerp(l.x, tx, p), Fx.lerp(l.y, textY, p) - fx.dp(50) * (float) Math.sin(Math.PI * p),
                         20, 1 - 0.3f * p, (1 - u * u) * s, fx.accent(), 0);
                 return true;
             } else if ("form".equals(wordMode)) {
@@ -186,7 +189,7 @@ final class SwipeWordFx extends FxModule {
                 if (e > fx.D(260) + hold + fx.D(240)) return false;
                 final float pu = Fx.clamp01(u), x = Fx.lerp(l.x, tx, Fx.easeOutBack(pu)), y = Fx.lerp(l.y, ty, Fx.easeOutBack(pu));
                 final float popU = Fx.clamp01((e - fx.D(260) - hold) / fx.D(240));
-                fx.glowText(c, glyphAt(word, l.wi), x, y, 20, 1.1f + 0.4f * popU, (1 - popU) * s, fx.accent(), 0);
+                fx.glowText(c, l.wg, x, y, 20, 1.1f + 0.4f * popU, (1 - popU) * s, fx.accent(), 0);
                 return true;
             } else if (typed) {
                 // Typewriter: each letter is struck into the suggestion bar in order, with a carriage caret
@@ -196,7 +199,7 @@ final class SwipeWordFx extends FxModule {
                 final float out = Fx.clamp01((e - endAt) / fx.D(250));
                 final float x = Fx.lerp(l.x, tx, Fx.easeIn(fly)), y = Fx.lerp(l.y, ty, Fx.easeIn(fly));
                 final float stamp = fly >= 1 ? 1 + 0.4f * (1 - Fx.easeOut(Fx.clamp01((e - fx.D(140)) / fx.D(120)))) : 1;
-                fx.glowText(c, glyphAt(word, l.wi), x, y, 20, stamp, (1 - out) * s, fx.accent(), 0);
+                fx.glowText(c, l.wg, x, y, 20, stamp, (1 - out) * s, fx.accent(), 0);
                 if (fly >= 1 && l.order == wordLetters - 1 && out < 1 && ((int) (e / 260)) % 2 == 0) {
                     // The caret blinks after the last letter
                     c.drawRect(tx + fx.dp(8), ty - fx.dp(9), tx + fx.dp(10), ty + fx.dp(9), fx.fill(Fx.alpha(fx.accent(), (1 - out) * s)));
@@ -217,7 +220,7 @@ final class SwipeWordFx extends FxModule {
                 }
                 final float f = Fx.clamp01((e - fx.D(380) - fx.D(160)) / fx.D(450));
                 if (f >= 1) return false;
-                fx.glowText(c, glyphAt(word, l.wi), tx, ty, 20, 0.85f, (1 - f) * s,
+                fx.glowText(c, l.wg, tx, ty, 20, 0.85f, (1 - f) * s,
                         Fx.mix(0xFFFFFFFF, fx.accent(), Fx.clamp01((e - fx.D(380)) / fx.D(200))), 0);
                 return true;
             } else if ("glow".equals(wordMode)) {
@@ -236,14 +239,14 @@ final class SwipeWordFx extends FxModule {
 
         /** An extra letter (not in the word): greyed first if asked, then its own exit. */
         boolean exitExtra(Canvas c, HopLetter l, long t, float s) {
-            final float start = exitAt + (mark ? fx.D(160) : 0) + l.order * fx.D(25), e = t - start;
+            final float e = (t - exitAt) - ((mark ? fx.D(160) : 0) + l.order * fx.D(25));
             if (e < 0) {
                 // Marked: the extras dim to grey for a moment, so it is clear they were not in the word
                 final float k = mark ? Fx.clamp01((t - exitAt) / fx.D(120)) : 0;
-                fx.glowText(c, l.g, l.x, l.y, 20, 1 - 0.1f * k, (1 - 0.35f * k) * s, Fx.mix(fx.accent(), GREY, k), 0);
+                fx.glowText(c, l.g, l.x, l.y, 20, 1 - 0.1f * k, (1 - 0.35f * k) * s, Fx.mix(fx.accent(), grey(), k), 0);
                 return true;
             }
-            final int col = mark ? GREY : fx.accent();
+            final int col = mark ? grey() : fx.accent();
             if ("burn".equals(extraMode)) {
                 final float u = e / fx.D(520);
                 if (u >= 1) return false;
@@ -321,20 +324,21 @@ final class SwipeWordFx extends FxModule {
             }
             word = w;
             wordCount = Math.max(1, w.codePointCount(0, w.length()));
-            // The text field is above the suggestion bar; hosts without one get a point above the keys
+            // Roughly where the text field sits: above the suggestion bar, or above the keys when there is none
             final RectF sg = fx.layout().suggestions;
             textY = sg.width() > 0 && sg.height() > 0 ? Math.max(fx.dp(14), sg.top - fx.dp(30)) : wordPoint()[1];
-            textX = wordPoint()[0];
+            wordAt = wordPoint();
+            textX = wordAt[0];
             // Match the word's letters to picked letters in order: matched ones are "in the word"
             int j = 0;
-            final String lower = w.toLowerCase();
-            for (int wi = 0, cp = 0; cp < lower.length(); wi++) {
-                final int cpv = lower.codePointAt(cp);
+            for (int wi = 0, cp = 0; cp < w.length(); wi++) {
+                final int cpv = w.codePointAt(cp);
                 final String ch = new String(Character.toChars(cpv));
                 cp += Character.charCount(cpv);
                 for (int k = j; k < letters.size(); k++) {
                     if (letters.get(k).g.equalsIgnoreCase(ch)) {
                         letters.get(k).wi = wi;
+                        letters.get(k).wg = ch;
                         j = k + 1;
                         break;
                     }
@@ -535,7 +539,7 @@ final class SwipeWordFx extends FxModule {
             hop.finish(word);
             hop = null;
         }
-        if (fx.on("burst")) burst();
+        if (word != null && fx.on("burst")) burst();
     }
 
     @Override
