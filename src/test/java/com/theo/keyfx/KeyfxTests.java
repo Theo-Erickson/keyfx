@@ -7,6 +7,7 @@ public final class KeyfxTests {
     public static void main(String[] args) {
         keyLookStartsPlain();
         keyLookCombines();
+        keyLookLabel();
         popupArcSingle();
         popupArcThree();
         popupArcClamps();
@@ -35,6 +36,15 @@ public final class KeyfxTests {
 
     static void keyLookStartsPlain() {
         check(new KeyLook().isPlain(), "a new KeyLook is plain");
+    }
+
+    static void keyLookLabel() {
+        final KeyLook l = new KeyLook();
+        check(l.label == null, "a new KeyLook has no label override");
+        l.label = "A";
+        check(!l.isPlain(), "a KeyLook with only a label is not plain");
+        l.reset();
+        check(l.label == null && l.isPlain(), "reset clears the label");
     }
 
     static void keyLookCombines() {
