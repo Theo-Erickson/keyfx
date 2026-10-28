@@ -182,20 +182,27 @@ final class SpecialKeysFx extends FxModule {
     private static void enterShockwave(final KeyFx fx, final FxKey k, final float dur, final float s) {
         final long t0 = fx.now();
         final RectF kb = fx.layout().keyboard;
-        final float maxR = (float) Math.hypot(kb.width(), kb.height()), band = fx.dp(26);
-        addMove(fx, k, KeyMove.SQUISH, fx.D(180), 0, null);
+        final float maxR = (float) Math.hypot(kb.width(), kb.height());
+        addMove(fx, k, KeyMove.SQUISH, fx.now(), fx.D(180), 0, null);
+        // One unit-radius gradient, scaled to the ring radius each frame; the band scales with it
+        final Shader ring = new RadialGradient(0, 0, 1,
+                new int[] { Fx.alpha(fx.accent(), 0), Fx.alpha(fx.accent(), 0), Fx.alpha(fx.accent(), 0.35f * s),
+                        Fx.alpha(fx.accent(), 0) },
+                new float[] { 0, 0.7f, 0.94f, 1 }, Shader.TileMode.CLAMP);
         fx.add(new Effect() {
             @Override
             public boolean draw(Canvas c, long t) {
                 final float u = (t - t0) / dur;
                 if (u >= 1) return false;
-                final float r = Math.max(1, maxR * Fx.easeOut(u)), r0 = Math.max(0, r - band);
+                final float r = Math.max(1, maxR * Fx.easeOut(u));
                 final Paint p = fx.fill(0xFFFFFFFF);
-                p.setShader(new RadialGradient(k.cx(), k.cy(), r,
-                        new int[] { Fx.alpha(fx.accent(), 0), Fx.alpha(fx.accent(), 0),
-                                Fx.alpha(fx.accent(), 0.35f * (1 - u) * s), Fx.alpha(fx.accent(), 0) },
-                        new float[] { 0, r0 / r, (r0 + 0.8f * (r - r0)) / r, 1 }, Shader.TileMode.CLAMP));
-                c.drawCircle(k.cx(), k.cy(), r, p);
+                p.setShader(ring);
+                p.setAlpha((int) (255 * (1 - u)));
+                c.save();
+                c.translate(k.cx(), k.cy());
+                c.scale(r, r);
+                c.drawCircle(0, 0, 1, p);
+                c.restore();
                 c.drawCircle(k.cx(), k.cy(), r, fx.stroke(Fx.alpha(fx.accent(), 0.8f * (1 - u) * s), fx.dp(2)));
                 return true;
             }
@@ -236,7 +243,7 @@ final class SpecialKeysFx extends FxModule {
                     final float p = Fx.easeIn(u);
                     final float x = k.cx() - fx.dp(40) * p * p, y = k.cy() - rise * p;
                     final float ang = (float) Math.atan2(-rise, -fx.dp(80) * p) + (float) Math.PI / 2;
-                    final float flick = fx.dp(2) * (1 + (float) Math.sin(t * 0.06f));
+                    final float flick = fx.dp(2) * (1 + (float) Math.sin((t - t0) * 0.06f));
                     c.save();
                     c.translate(x, y);
                     c.rotate((float) Math.toDegrees(ang));
@@ -277,15 +284,24 @@ final class SpecialKeysFx extends FxModule {
             top[row] = Math.min(top[row], q.top);
             bot[row] = Math.max(bot[row], q.bottom);
         }
+        // Drop empty rows, so the stagger counts only rows that light up
+        final float[] rt = new float[n], rb = new float[n];
+        int cnt = 0;
+        for (int i = 0; i < n; i++) {
+            if (top[i] > bot[i]) continue;
+            rt[cnt] = top[i];
+            rb[cnt] = bot[i];
+            cnt++;
+        }
+        final int rows = cnt;
         final RectF kb = fx.layout().keyboard;
         final float kbL = kb.left, kbR = kb.right;
         fx.add(new Effect() {
             @Override
             public boolean draw(Canvas c, long t) {
                 boolean alive = false;
-                for (int i = 0; i < n; i++) {
-                    final int row = n - 1 - i;
-                    if (top[row] > bot[row]) continue;
+                for (int i = 0; i < rows; i++) {
+                    final int row = rows - 1 - i;
                     final float u = (t - t0 - i * dur * 0.16f) / (dur * 0.5f);
                     if (u < 0) {
                         alive = true;
@@ -293,7 +309,7 @@ final class SpecialKeysFx extends FxModule {
                     }
                     if (u >= 1) continue;
                     alive = true;
-                    c.drawRect(kbL, top[row] - fx.dp(2), kbR, bot[row] + fx.dp(2),
+                    c.drawRect(kbL, rt[row] - fx.dp(2), kbR, rb[row] + fx.dp(2),
                             fx.fill(Fx.alpha(fx.accent(), 0.3f * (float) Math.sin(Math.PI * u) * s)));
                 }
                 return alive;
@@ -331,11 +347,7 @@ final class SpecialKeysFx extends FxModule {
                 }
                 final Paint line = fx.stroke(Fx.alpha(fx.accent(), fade * s), fx.dp(4));
                 line.setShadowLayer(fx.dp(10), 0, 0, Fx.alpha(fx.accent(), fade * s));
-                line.setStrokeCap(Paint.Cap.ROUND);
-                line.setStrokeJoin(Paint.Join.ROUND);
                 c.drawPath(path, line);
-                line.setStrokeCap(Paint.Cap.BUTT);
-                line.setStrokeJoin(Paint.Join.MITER);
                 c.restore();
                 return true;
             }
@@ -368,14 +380,21 @@ final class SpecialKeysFx extends FxModule {
     // Per host, because the backspace hold also starts taps through the static deleteTap
     private static final WeakHashMap<KeyFx, ArrayList<KeyMove>> MOVES = new WeakHashMap<>();
 
-    private static void addMove(KeyFx fx, FxKey k, int kind, float dur, float amount, float[] table) {
+    private static void addMove(KeyFx fx, FxKey k, int kind, long start, float dur, float amount, float[] table) {
         if ((fx.caps & KeyFx.CAP_KEY_TRANSFORM) == 0) return;
         ArrayList<KeyMove> list = MOVES.get(fx);
         if (list == null) {
             list = new ArrayList<>();
             MOVES.put(fx, list);
         }
-        list.add(new KeyMove(k, fx.now(), dur, kind, amount, table));
+        // A repeat replaces the one still running, so moves never stack
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).k == k && list.get(i).kind == kind) {
+                list.remove(i);
+                i--;
+            }
+        }
+        list.add(new KeyMove(k, start, dur, kind, amount, table));
         fx.kick();
     }
 
@@ -385,7 +404,8 @@ final class SpecialKeysFx extends FxModule {
         if (list == null) return;
         for (KeyMove m : list) {
             if (m.k != k) continue;
-            final float u = Fx.clamp01((t - m.t0) / m.dur);
+            if (t < m.t0 || t >= m.t0 + m.dur) continue;
+            final float u = (t - m.t0) / m.dur;
             if (m.kind == KeyMove.SQUISH) out.scaleBy(0.92f + 0.08f * u);
             else if (m.kind == KeyMove.PRESS) out.move(0, m.amount * (1 - Math.abs(2 * u - 1)));
             else out.move(m.table[Math.min(m.table.length - 1, (int) (u * m.table.length))], 0);
@@ -615,14 +635,18 @@ final class SpecialKeysFx extends FxModule {
         final float sx = k.cx(), sy = k.top + k.h() * 0.42f;
         // No letter known: aim at the middle of the keyboard's top edge
         final float tx = L != null ? L.x : (fx.layout().keyboard.left + fx.layout().keyboard.right) / 2;
-        final float ty = L != null ? L.y : fx.layout().keyboard.top - fx.dp(24);
+        final float ty = L != null ? L.y : Math.max(fx.dp(8), fx.layout().keyboard.top - fx.dp(24));
         final float[] sa = new float[10], sv = new float[10];
         for (int i = 0; i < 10; i++) {
             sa[i] = (float) Math.atan2(sy - ty, sx - tx) + fx.rand(-1.3f, 1.3f);
             sv[i] = fx.dp(fx.rand(60, 170));
         }
         final float total = travel + hold + fx.D(420), after = fx.D(420), gravity = fx.dp(260);
-        if (delay <= 0) addMove(fx, k, KeyMove.PRESS, fx.D(140), fx.dp(1.5f), null);
+        addMove(fx, k, KeyMove.PRESS, t0, fx.D(140), fx.dp(1.5f), null);
+        // The muzzle gradient is built once; each frame only changes the paint alpha
+        final Shader muzzle = new RadialGradient(sx, sy, fx.dp(10),
+                new int[] { Fx.alpha(0xFFFFFFFF, 0.9f * s), Fx.alpha(col, 0.6f * s), Fx.alpha(col, 0) },
+                new float[] { 0, 0.4f, 1 }, Shader.TileMode.CLAMP);
         fx.add(new Effect() {
             @Override
             public boolean draw(Canvas c, long t) {
@@ -635,17 +659,13 @@ final class SpecialKeysFx extends FxModule {
                     final float hx = Fx.lerp(sx, tx, reach), hy = Fx.lerp(sy, ty, reach);
                     final Paint glow = fx.stroke(Fx.alpha(col, 0.85f * beamA * s), width * 1.8f * (0.5f + 0.5f * beamA));
                     glow.setShadowLayer(fx.dp(14), 0, 0, Fx.alpha(col, s));
-                    glow.setStrokeCap(Paint.Cap.ROUND);
                     c.drawLine(sx, sy, hx, hy, glow);
                     final Paint core = fx.stroke(Fx.alpha(0xFFFFFFFF, 0.9f * beamA * s), width * 0.55f);
-                    core.setStrokeCap(Paint.Cap.ROUND);
                     c.drawLine(sx, sy, hx, hy, core);
-                    core.setStrokeCap(Paint.Cap.BUTT);
                     // Muzzle glow on the backspace icon
                     final Paint mz = fx.fill(0xFFFFFFFF);
-                    mz.setShader(new RadialGradient(sx, sy, fx.dp(10),
-                            new int[] { Fx.alpha(0xFFFFFFFF, 0.9f * beamA * s), Fx.alpha(col, 0.6f * beamA * s), Fx.alpha(col, 0) },
-                            new float[] { 0, 0.4f, 1 }, Shader.TileMode.CLAMP));
+                    mz.setShader(muzzle);
+                    mz.setAlpha((int) (255 * beamA));
                     c.drawCircle(sx, sy, fx.dp(10), mz);
                 }
                 if (e >= travel) {
@@ -688,19 +708,31 @@ final class SpecialKeysFx extends FxModule {
         });
     }
 
+    private static Bitmap grainBmp;
+    private static int[] grainPx;
+    private static Paint grainPaint;
+
     /** The glyph is rasterized once; each lit pixel becomes a grain at (dx, dy) from the glyph center. Returns {dx, dy, w}. */
     private static float[][] glyphGrains(String str, float size, float step) {
         final int w = (int) Math.ceil(size * 1.4f * Math.max(1, str.codePointCount(0, str.length())));
         final int h = (int) Math.ceil(size * 1.6f);
-        final Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-        final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setTextSize(size);
-        p.setColor(0xFFFFFFFF);
-        p.setTextAlign(Paint.Align.CENTER);
-        new Canvas(bmp).drawText(str, w / 2f, h / 2f + size * 0.36f, p);
-        final int[] px = new int[w * h];
+        // One scratch bitmap, buffer and paint, grown as needed (UI thread only)
+        if (grainBmp == null || grainBmp.getWidth() < w || grainBmp.getHeight() < h) {
+            if (grainBmp != null) grainBmp.recycle();
+            grainBmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        }
+        if (grainPx == null || grainPx.length < w * h) grainPx = new int[w * h];
+        if (grainPaint == null) {
+            grainPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            grainPaint.setColor(0xFFFFFFFF);
+            grainPaint.setTextAlign(Paint.Align.CENTER);
+        }
+        final Bitmap bmp = grainBmp;
+        final int[] px = grainPx;
+        bmp.eraseColor(0);
+        grainPaint.setTextSize(size);
+        new Canvas(bmp).drawText(str, w / 2f, h / 2f + size * 0.36f, grainPaint);
         bmp.getPixels(px, 0, w, 0, 0, w, h);
-        bmp.recycle();
         final ArrayList<float[]> out = new ArrayList<>();
         for (float y = 0; y < h; y += step) {
             for (float x = 0; x < w; x += step) {
@@ -713,6 +745,7 @@ final class SpecialKeysFx extends FxModule {
 
     /** The glyph crumbles from left to right into grains that drift on the wind and fade. */
     private static void disintegrate(final KeyFx fx, final FxLetter L, final float s, float delay) {
+        if (L.ch == null || !(L.size > 0)) return;
         final long t0 = fx.now() + (long) delay;
         final float life = fx.D(fx.settings.f("del", "dustLife"));
         final String wind = fx.settings.s("del", "dustWind");
@@ -865,7 +898,8 @@ final class SpecialKeysFx extends FxModule {
                 // Blink: a couple of dropped frames near the end
                 if (u > 0.6f && blink[st]) return true;
                 final float amp = glitch * (0.4f + u);
-                c.saveLayer(null, add);
+                final float pad = amp + L.size;
+                c.saveLayer(L.x - pad, L.y - L.size, L.x + pad, L.y + L.size, add);
                 for (int j = 0; j < 3; j++) {
                     fx.plainText(c, L.ch, L.x + (j - 1) * amp * ch[st][j], L.y + ch[st][3 + j] * amp * 0.3f, L.size,
                             Fx.alpha(cols[j], (1 - u) * 0.9f * s), 0, 1);
@@ -888,20 +922,23 @@ final class SpecialKeysFx extends FxModule {
     private static void glitchKey(final KeyFx fx, final FxKey k, final float s) {
         final long t0 = fx.now();
         final float dur = fx.D(260), glitch = fx.dp(fx.settings.f("del", "glitch"));
-        final float[][] strip = new float[GLITCH_STEPS][4 * 5];
+        final float[][] strip = new float[GLITCH_STEPS][4 * 6];
         final float[] jitter = new float[GLITCH_STEPS];
         for (int i = 0; i < GLITCH_STEPS; i++) {
             for (int j = 0; j < 4; j++) {
-                strip[i][j * 5] = fx.rand(0, k.h() - fx.dp(4));
-                strip[i][j * 5 + 1] = fx.dp(fx.rand(2, 6));
-                strip[i][j * 5 + 2] = fx.rand(-1, 1) * glitch * 2;
-                strip[i][j * 5 + 3] = fx.rnd.nextFloat() < 0.5f ? 1 : 0;
-                strip[i][j * 5 + 4] = fx.rand(0.3f, 1);
+                strip[i][j * 6] = fx.rand(0, k.h() - fx.dp(4));
+                strip[i][j * 6 + 1] = fx.dp(fx.rand(2, 6));
+                strip[i][j * 6 + 2] = fx.rand(-1, 1) * glitch * 2;
+                strip[i][j * 6 + 3] = fx.rnd.nextFloat() < 0.5f ? 1 : 0;
+                strip[i][j * 6 + 4] = fx.rand(0.3f, 1);
+                // Its own offset for the scanline
+                strip[i][j * 6 + 5] = fx.dp(fx.rand(-3, 3));
             }
             jitter[i] = fx.rand(-1, 1) * glitch * 2;
         }
-        // Only the sideways jitter needs the real key to move
-        addMove(fx, k, KeyMove.JITTER, dur, 0, jitter);
+        // The opaque key-colored slices only suit hosts that move the real key too
+        final boolean slices = (fx.caps & KeyFx.CAP_KEY_TRANSFORM) != 0;
+        addMove(fx, k, KeyMove.JITTER, t0, dur, 0, jitter);
         fx.add(new Effect() {
             @Override
             public boolean draw(Canvas c, long t) {
@@ -909,11 +946,13 @@ final class SpecialKeysFx extends FxModule {
                 if (u >= 1) return false;
                 final float[] a = strip[Math.min(GLITCH_STEPS - 1, (int) (u * GLITCH_STEPS))];
                 for (int j = 0; j < 4; j++) {
-                    final float y = k.top + a[j * 5], off = a[j * 5 + 2];
-                    c.drawRect(k.left + off, y, k.right + off, y + a[j * 5 + 1], fx.fill(Fx.alpha(fx.keyFill(), (1 - u) * s)));
-                    final float lx = k.left + off + fx.dp(a[j * 5 + 4] * 6 - 3);
-                    c.drawRect(lx, y, lx + k.w() * a[j * 5 + 4], y + fx.dp(1),
-                            fx.fill(Fx.alpha(a[j * 5 + 3] > 0 ? 0xFFFF2A55 : 0xFF22D3FF, 0.5f * (1 - u) * s)));
+                    final float y = k.top + a[j * 6], off = a[j * 6 + 2];
+                    if (slices) {
+                        c.drawRect(k.left + off, y, k.right + off, y + a[j * 6 + 1], fx.fill(Fx.alpha(fx.keyFill(), (1 - u) * s)));
+                    }
+                    final float lx = k.left + off + a[j * 6 + 5];
+                    c.drawRect(lx, y, lx + k.w() * a[j * 6 + 4], y + fx.dp(1),
+                            fx.fill(Fx.alpha(a[j * 6 + 3] > 0 ? 0xFFFF2A55 : 0xFF22D3FF, 0.5f * (1 - u) * s)));
                 }
                 return true;
             }
