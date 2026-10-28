@@ -1,6 +1,7 @@
 package com.theo.keyfx;
 
 import android.graphics.Canvas;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RadialGradient;
@@ -97,7 +98,14 @@ final class SwipeTrailFx extends FxModule {
     // Circuit trail: grid-snapped points (x, y, time), side branches (x, y, x2, y2, time) and pulse start times
     private final ArrayList<float[]> cPts = new ArrayList<>();
     private final ArrayList<float[]> cStubs = new ArrayList<>();
-    private final ArrayList<Float> cPulses = new ArrayList<>();
+    private final float[] cPulses = new float[64];
+    private int cPulseN;
+    // Reused while drawing pulses
+    private final float[] pulseH = new float[2], pulseT = new float[2];
+    private final Matrix pulseM = new Matrix();
+    private RadialGradient pulseShader;
+    private int pulseCol;
+    private float pulseR;
     private float cLastPulse;
     // Lightning: picked letters (x, y, time) and scratch space for the bolts
     private final ArrayList<float[]> picks = new ArrayList<>();
@@ -136,7 +144,7 @@ final class SwipeTrailFx extends FxModule {
         endAt = 0;
         cPts.clear();
         cStubs.clear();
-        cPulses.clear();
+        cPulseN = 0;
         cLastPulse = 0;
         picks.clear();
         ripples.clear();
@@ -207,7 +215,7 @@ final class SwipeTrailFx extends FxModule {
         dust.clear();
         cPts.clear();
         cStubs.clear();
-        cPulses.clear();
+        cPulseN = 0;
         picks.clear();
         ripples.clear();
         swells.clear();
@@ -216,12 +224,25 @@ final class SwipeTrailFx extends FxModule {
 
     // region Key grow
 
-    /** The swell from 0 to 1 and back, rising over the first 22% like the lab. NaN once it is over. */
+    /** The swell from 0 to 1 and back, peaking at 22% of the eased progress like the lab. NaN once it is over. */
     private static float swellAmount(Swell w, long elapsed) {
         final float p = elapsed / w.dur;
         if (p >= 1) return Float.NaN;
-        if (p < 0.22f) return Fx.easeOut(p / 0.22f);
-        return 1 - Fx.easeOut((p - 0.22f) / 0.78f);
+        final float e = bezier(0.3f, 0.7f, 0.4f, 1f, p);
+        return e < 0.22f ? e / 0.22f : 1 - (e - 0.22f) / 0.78f;
+    }
+
+    /** CSS cubic-bezier(x1, y1, x2, y2) easing: solves x(u) = p with Newton steps, then returns y(u). */
+    private static float bezier(float x1, float y1, float x2, float y2, float p) {
+        float u = p;
+        for (int i = 0; i < 6; i++) {
+            final float v = 1 - u, x = 3 * v * v * u * x1 + 3 * v * u * u * x2 + u * u * u - p;
+            final float dx = 3 * v * v * x1 + 6 * v * u * (x2 - x1) + 3 * u * u * (1 - x2);
+            if (Math.abs(dx) < 1e-5f) break;
+            u = Fx.clamp01(u - x / dx);
+        }
+        final float v = 1 - u;
+        return 3 * v * v * u * y1 + 3 * v * u * u * y2 + u * u * u;
     }
 
     @Override
@@ -386,7 +407,7 @@ final class SwipeTrailFx extends FxModule {
         if (fade <= 0) {
             cPts.clear();
             cStubs.clear();
-            cPulses.clear();
+            cPulseN = 0;
             return false;
         }
         final float a = fade * s;
@@ -422,27 +443,35 @@ final class SwipeTrailFx extends FxModule {
                 fx.fill(Fx.alpha(col, 0.95f * a)));
         // Light pulses run from the start toward the finger
         if (fx.settings.b("circuit", "pulse")) {
-            if (active && t - cLastPulse > fx.D(260)) {
-                cPulses.add(t);
+            if (active && t - cLastPulse > fx.D(260) && cPulseN < cPulses.length) {
+                cPulses[cPulseN++] = t;
                 cLastPulse = t;
             }
             final float len = circuitLength(), speed = fx.dp(0.7f) / fx.D(1), r = fx.dp(7), tail = fx.dp(14);
-            for (int i = 0; i < cPulses.size(); i++) {
-                if ((t - cPulses.get(i)) * speed >= len + fx.dp(20)) {
-                    cPulses.remove(i);
+            for (int i = 0; i < cPulseN; i++) {
+                if ((t - cPulses[i]) * speed >= len + fx.dp(20)) {
+                    System.arraycopy(cPulses, i + 1, cPulses, i, cPulseN - i - 1);
+                    cPulseN--;
                     i--;
                 }
             }
-            final float[] h = new float[2], tl = new float[2];
-            for (int i = 0; i < cPulses.size(); i++) {
-                final float d = (t - cPulses.get(i)) * speed;
-                circuitPointAt(Math.min(d, len), h);
-                circuitPointAt(Math.max(0, Math.min(d, len) - tail), tl);
+            // One white-to-clear gradient at the origin, moved to each pulse with a matrix
+            if (pulseShader == null || pulseCol != col || pulseR != r) {
+                pulseShader = new RadialGradient(0, 0, r, 0xFFFFFFFF, Fx.alpha(col, 0), Shader.TileMode.CLAMP);
+                pulseCol = col;
+                pulseR = r;
+            }
+            for (int i = 0; i < cPulseN; i++) {
+                final float d = (t - cPulses[i]) * speed;
+                circuitPointAt(Math.min(d, len), pulseH);
+                circuitPointAt(Math.max(0, Math.min(d, len) - tail), pulseT);
                 final Paint g = fx.fill(0xFFFFFFFF);
-                g.setShader(new RadialGradient(h[0], h[1], r, Fx.alpha(0xFFFFFFFF, 0.95f * a), Fx.alpha(col, 0),
-                        Shader.TileMode.CLAMP));
-                c.drawCircle(h[0], h[1], r, g);
-                c.drawLine(tl[0], tl[1], h[0], h[1], fx.stroke(Fx.alpha(0xFFFFFFFF, 0.6f * a), fx.dp(2)));
+                g.setShader(pulseShader);
+                g.setAlpha(Math.round(255 * Fx.clamp01(0.95f * a)));
+                pulseM.setTranslate(pulseH[0], pulseH[1]);
+                pulseShader.setLocalMatrix(pulseM);
+                c.drawCircle(pulseH[0], pulseH[1], r, g);
+                c.drawLine(pulseT[0], pulseT[1], pulseH[0], pulseH[1], fx.stroke(Fx.alpha(0xFFFFFFFF, 0.6f * a), fx.dp(2)));
             }
         }
         return true;
