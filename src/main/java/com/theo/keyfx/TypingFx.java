@@ -11,7 +11,11 @@ import android.graphics.Shader;
 import java.util.ArrayList;
 import java.util.Collections;
 
-/** What a normal key tap does: key pop, letter float, heat streak, neighbor wave, ripple and sparks. */
+/**
+ * What a normal key tap does: key pop, letter float, heat streak (glow, wave, bar, circuit or
+ * embers, with an optional combo counter), neighbor wave (wave, orbit, firework or firecracker),
+ * ripple, sparks and water drop.
+ */
 final class TypingFx extends FxModule {
     private static final String G = "Typing";
 
@@ -78,6 +82,14 @@ final class TypingFx extends FxModule {
     // Heat level from 0 to 1, decaying over time
     private float heat;
     private long heatAt;
+    // Heat wave phase, accumulated so a changing speed doesn't make it jump
+    private double heatPh;
+    private long heatPhAt, emberAt;
+    // Letters crossed by the current swipe (doubles collapsed), the combo's fallback when no word arrives
+    private int crossedN;
+    private String crossedLast;
+    private String comboText = "";
+    private int shownN;
     /** An ember rising off the heat streak's edge (x, rise speed and radius in dp). */
     private static final class Ember {
         final long t0;
@@ -154,14 +166,27 @@ final class TypingFx extends FxModule {
     @Override
     public void onSwipeWord(String word) {
         // A swiped word counts each of its letters, with doubled letters collapsed as the lab does
-        if (word == null) return;
+        // No word arrived: fall back to the letters the swipe crossed, like the lab
+        if (word == null) {
+            comboHit(crossedN);
+            return;
+        }
         int n = 0;
         for (int i = 0; i < word.length(); i++) if (i == 0 || word.charAt(i) != word.charAt(i - 1)) n++;
         comboHit(n);
     }
 
     @Override
+    public void onSwipeStart() {
+        crossedN = 0;
+        crossedLast = null;
+    }
+
+    @Override
     public void onSwipeCross(FxKey k, int index) {
+        final String g = k.isLetter() ? k.glyph() : null;
+        if (g != null && !g.equals(crossedLast)) crossedN++;
+        if (g != null) crossedLast = g;
         if (fx.settings.b("heat", "swipe")) addHeat(fx.settings.f("heat", "build") * 0.6f);
     }
 
@@ -169,8 +194,15 @@ final class TypingFx extends FxModule {
     public void reset() {
         heat = 0;
         heatAt = 0;
+        heatPh = 0;
+        heatPhAt = 0;
+        emberAt = 0;
         embers.clear();
+        crossedN = 0;
+        crossedLast = null;
         comboN = 0;
+        comboText = "";
+        shownN = 0;
         comboLast = 0;
         comboBumpAt = 0;
         presses.clear();
@@ -272,6 +304,9 @@ final class TypingFx extends FxModule {
         if (heat < 0.012f || !fx.on("heat")) {
             heat = 0;
             heatAt = 0;
+            heatPh = 0;
+            heatPhAt = 0;
+            emberAt = 0;
             embers.clear();
             return false;
         }
@@ -295,7 +330,10 @@ final class TypingFx extends FxModule {
         if ("wave".equals(style)) {
             // A wave that grows taller and faster as the heat builds
             final float amp = 2 + 9 * L, k = 0.045f;
-            final float ph = (float) ((t / (double) (260 - 150 * L)) % (Math.PI * 2));
+            // Accumulated, so the speed changing with the heat doesn't make the wave jump
+            if (heatPhAt != 0) heatPh = (heatPh + (t - heatPhAt) / (double) (260 - 150 * L)) % (2 * Math.PI);
+            heatPhAt = t;
+            final float ph = (float) heatPh;
             Path p = fx.path();
             for (float x = 0; x <= w; x += 4) {
                 final float y = 2 + amp * (0.5f + 0.5f * (float) Math.sin(x * k - ph));
@@ -348,7 +386,10 @@ final class TypingFx extends FxModule {
             }
         } else if ("embers".equals(style)) {
             // Embers rise off the top edge, more and hotter as the heat builds
-            if (fx.rnd.nextFloat() < 0.15f + 0.85f * L) {
+            // The lab spawns per 60 Hz frame, so scale the chance by the frame time
+            final float dt = emberAt == 0 ? 16.7f : Math.min(50, t - emberAt);
+            emberAt = t;
+            if (embers.size() < 200 && fx.rnd.nextFloat() < (0.15f + 0.85f * L) * dt / 16.7f) {
                 for (int i = 0; i < 1 + (int) (L * 3); i++) {
                     embers.add(new Ember(t, fx.rand(0, w), fx.rand(20, 50 + 60 * L), fx.rand(1, 2.4f), fx.rand(0, 6)));
                 }
@@ -431,7 +472,11 @@ final class TypingFx extends FxModule {
         final float bump = 1 + 0.35f * (1 - Fx.easeOut((t - comboBumpAt) / fx.D(180)));
         final int col = Fx.mix(fx.accent(), 0xFFFF8A3D, comboN / 40f);
         final float x = fx.layout().keyboard.right - fx.dp(46), y = fx.layout().keyboard.top - fx.dp(16);
-        fx.glowText(c, "×" + comboN, x, y, 20, bump, fade * s, col, 0);
+        if (shownN != comboN) {
+            shownN = comboN;
+            comboText = "×" + comboN;
+        }
+        fx.glowText(c, comboText, x, y, 20, bump, fade * s, col, 0);
         // The time left in the combo, as a shrinking bar under the number
         final float left = 1 - Fx.clamp01(since / win);
         c.drawRect(x - fx.dp(22), y + fx.dp(13), x - fx.dp(22) + fx.dp(44) * left, y + fx.dp(15.5f),
@@ -587,17 +632,9 @@ final class TypingFx extends FxModule {
         final long t0 = fx.now();
         final ArrayList<FxKey> order = new ArrayList<>(list);
         Collections.shuffle(order, fx.rnd);
-        final int n = order.size(), steps = 6;
-        final float[] at = new float[n], jx = new float[n * steps], jy = new float[n * steps], sparkA = new float[n * 4];
-        for (int i = 0; i < n; i++) {
-            at[i] = fx.D(i * 45 + fx.rand(0, 20));
-            for (int j = 0; j < steps; j++) {
-                // Unit jitter, scaled by how far along the pop is
-                jx[i * steps + j] = fx.rand(-1, 1);
-                jy[i * steps + j] = fx.rand(-1, 1);
-            }
-            for (int j = 0; j < 4; j++) sparkA[i * 4 + j] = fx.rand(0, (float) Math.PI * 2);
-        }
+        final int n = order.size();
+        final float[] at = new float[n];
+        for (int i = 0; i < n; i++) at[i] = fx.D(i * 45 + fx.rand(0, 20));
         fx.add(new Effect() {
             @Override
             public boolean draw(Canvas c, long t) {
@@ -611,16 +648,15 @@ final class TypingFx extends FxModule {
                     }
                     if (u >= 1) continue;
                     alive = true;
-                    // The jitter table steps about every 33 ms
-                    final int f = i * steps + (int) ((t - t0) / 33) % steps;
-                    final float j = fx.dp((1 - u) * 1.5f);
-                    fx.roundRect(c, q.left + jx[f] * j, q.top + jy[f] * j, q.right + jx[f] * j, q.bottom + jy[f] * j, 9,
+                    // Fresh jitter and spark angles every frame, so it crackles like the lab
+                    final float j = fx.dp((1 - u) * 1.5f), jx = fx.rand(-j, j), jy = fx.rand(-j, j);
+                    fx.roundRect(c, q.left + jx, q.top + jy, q.right + jx, q.bottom + jy, 9,
                             fx.fill(Fx.alpha(0xFFFFF5DC, 0.45f * (1 - u) * s)));
                     final Paint p = fx.fill(Fx.fire(u, (1 - u) * s));
                     final float d = fx.dp(6 + 12 * u), sz = fx.dp(1.6f);
                     for (int m = 0; m < 4; m++) {
-                        final float sx = q.cx() + (float) Math.cos(sparkA[i * 4 + m]) * d;
-                        final float sy = q.cy() + (float) Math.sin(sparkA[i * 4 + m]) * d;
+                        final float a = fx.rand(0, (float) Math.PI * 2);
+                        final float sx = q.cx() + (float) Math.cos(a) * d, sy = q.cy() + (float) Math.sin(a) * d;
                         c.drawRect(sx, sy, sx + sz, sy + sz, p);
                     }
                 }
