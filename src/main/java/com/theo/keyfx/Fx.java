@@ -151,6 +151,13 @@ public final class Fx {
             { "trackpad.look", "grid", "rails" },
     };
 
+    /** The word or extra exit that replaces a saved v3 hop "exit" value; wordKey picks which of the two. */
+    public static String hopFromExit(String exit, boolean wordKey) {
+        final boolean form = "form".equals(exit);
+        if (wordKey) return form ? "form" : "rise";
+        return form ? "fall" : exit;
+    }
+
     /** Maps a saved value of a removed choice onto what replaced it; other values pass through. */
     public static String migrate(String key, String value) {
         for (String[] m : MIGRATE) {

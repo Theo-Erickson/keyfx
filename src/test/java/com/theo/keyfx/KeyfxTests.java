@@ -110,6 +110,8 @@ public final class KeyfxTests {
         check("blackhole".equals(Fx.migrate("delHold.button", "storm")), "storm becomes black hole");
         check("rails".equals(Fx.migrate("trackpad.look", "grid")), "the moving grid becomes rails");
         check("ghost".equals(Fx.migrate("float.mode", "ghost")), "current values are kept");
+        check("form".equals(Fx.hopFromExit("form", true)) && "fall".equals(Fx.hopFromExit("form", false)), "old form exit");
+        check("rise".equals(Fx.hopFromExit("burn", true)) && "burn".equals(Fx.hopFromExit("burn", false)), "old burn exit");
     }
 
     static void comboCrossesTen() {

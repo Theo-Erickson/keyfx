@@ -84,6 +84,11 @@ public final class FxSettings {
     }
 
     public String s(String id, String k) {
+        if ("hop".equals(id) && ("word".equals(k) || "extra".equals(k)) && !values.containsKey(key(id, k))
+                && values.get(key(id, "exit")) instanceof String) {
+            // A saved v3 hop exit becomes the word and extra exits
+            return Fx.hopFromExit((String) values.get(key(id, "exit")), "word".equals(k));
+        }
         final Object v = values.get(key(id, k));
         final Field f = fields.get(key(id, k));
         if (v instanceof String) {

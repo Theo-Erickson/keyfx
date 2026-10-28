@@ -91,7 +91,7 @@ public final class KeyFx extends Drawable {
     public static final Section PICK = new Section("pick", "Swipe word", 500, "Swipe letter picking",
             "Which letters of a swipe count for letter hop and constellation. Key trace still lights every key you cross.",
             false, true,
-            Field.choice("mode", "Pick letters", "corners", "corners:Where you turn", "dwell:Where you pause",
+            Field.choice("mode", "Pick letters", "dwell", "corners:Where you turn", "dwell:Where you pause",
                     "all:Every key crossed"),
             Field.range("angle", "Turn needed", 30, 120, 1, "°", 55).when("mode", "corners"),
             Field.range("dwell", "Pause needed", 20, 300, 5, "ms", 90).when("mode", "dwell"));
