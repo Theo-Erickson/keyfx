@@ -375,6 +375,10 @@ public final class KeyFx extends Drawable {
     /** The shared stroke paint, reset to a plain color and width in px. */
     public Paint stroke(int color, float width) {
         reset(stroke);
+        // An effect may have changed these on the shared paint; every stroke starts round and solid
+        stroke.setStrokeCap(Paint.Cap.ROUND);
+        stroke.setStrokeJoin(Paint.Join.ROUND);
+        stroke.setPathEffect(null);
         stroke.setColor(color);
         stroke.setStrokeWidth(width);
         return stroke;
