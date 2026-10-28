@@ -29,14 +29,12 @@ final class ShowFx extends FxModule {
                         Field.range("duration", "Duration", 120, 900, 10, "ms", 320).whenNot("mode", "none"),
                         Field.range("stagger", "Stagger", 0, 120, 1, "ms", 40).whenNot("mode", "none"),
                         Field.range("overshoot", "Overshoot", 0, 3, 0.05f, "×", 1.2f).whenNot("mode", "none"),
-                        Field.toggle("perKey", "Animate each key", true).whenNot("mode", "none")
+                        Field.toggle("perKey", "Animate each key", true).whenNot("mode", "none", "piano", "decode", "flap")
                                 .requires(KeyFx.CAP_KEY_TRANSFORM)),
                 new Section("hide", G, 710, "Hide animation",
                         "A quick moment before the keyboard slides away.", false, true,
                         Field.choice("mode", "Style", "dip", "dip:Dip", "fold:Fold down", "sink:Sink", "scatter:Scatter",
-                                "shrink:Shrink to center", "none:None")
-                                .valueRequires("scatter", KeyFx.CAP_KEY_TRANSFORM)
-                                .valueRequires("shrink", KeyFx.CAP_KEY_TRANSFORM),
+                                "shrink:Shrink to center", "none:None"),
                         Field.range("duration", "Duration", 80, 600, 10, "ms", 160).whenNot("mode", "none"),
                         Field.range("stagger", "Stagger", 0, 60, 1, "ms", 18).whenNot("mode", "none", "sink"))
                         .requires(KeyFx.CAP_HIDE_ANIMATION),
@@ -96,7 +94,7 @@ final class ShowFx extends FxModule {
                 // Showing: invisible until it starts. Hiding: in place until it starts
                 final float p = Fx.clamp01(u);
                 final float e = hiding ? Fx.easeIn(p) : back(p, overshoot);
-                final float alpha = hiding ? 1 - p : Fx.clamp01(p * 1.6f);
+                final float alpha = hiding ? 1 - e : Fx.clamp01(p * 1.6f);
                 if (alpha <= 0) continue;
                 src.set((int) (r[0] - kb.left), (int) (r[1] - kb.top), (int) (r[2] - kb.left), (int) (r[3] - kb.top));
                 float rot = 0;

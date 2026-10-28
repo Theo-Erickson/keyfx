@@ -680,11 +680,15 @@ public final class KeyFx extends Drawable {
 
     /**
      * False when the show animation moves the real keys itself through look() (hosts with
-     * CAP_KEY_TRANSFORM and "Animate each key" on): call show(null, onDone) and keep the view
+     * CAP_KEY_TRANSFORM and "Animate each key" on, or a style that only works on real keys: piano,
+     * decode and flap, whatever that toggle says): call show(null, onDone) and keep the view
      * visible; onDone still runs when the keys settle.
      */
     public boolean showNeedsSnapshot() {
-        return (caps & CAP_KEY_TRANSFORM) == 0 || !settings.b("show", "perKey");
+        if ((caps & CAP_KEY_TRANSFORM) == 0) return true;
+        final String mode = settings.s("show", "mode");
+        if ("piano".equals(mode) || "decode".equals(mode) || "flap".equals(mode)) return false;
+        return !settings.b("show", "perKey");
     }
 
     /**
