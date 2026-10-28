@@ -13,6 +13,7 @@ public final class KeyfxTests {
         popupLayoutsStayInside();
         popupColumnStacksUp();
         popupWheelAndGridShape();
+        popupLayoutsScaleWithDensity();
         litLettersCounts();
         migrates();
         comboCrossesTen();
@@ -111,6 +112,24 @@ public final class KeyfxTests {
         Fx.popupLayout("column", 200, 700, 680, 3, 70, 0, 0, 400, 800, 1, out);
         check(near(out[0], 200) && near(out[2], 200) && near(out[4], 200), "column keeps the key's x");
         check(near(out[1], 654) && near(out[3], 614) && near(out[5], 574), "column steps up 40 from the key, nearest first");
+    }
+
+    static void popupLayoutsScaleWithDensity() {
+        // At 2 px per dp the margins and spacings double, and every layout still stays inside
+        final String[] styles = { "bloom", "wheel", "column", "grid" };
+        for (String style : styles) {
+            for (int n = 1; n <= 9; n++) {
+                final float[] out = new float[2 * n];
+                Fx.popupLayout(style, 40, 1500, 1480, n, 140, 0, 0, 800, 1600, 2, out);
+                for (int i = 0; i < n; i++) {
+                    check(out[i * 2] >= 44 && out[i * 2] <= 756, style + " n=" + n + " x " + out[i * 2] + " inside at 2x");
+                    check(out[i * 2 + 1] >= 52 && out[i * 2 + 1] <= 1548, style + " n=" + n + " y " + out[i * 2 + 1] + " inside at 2x");
+                }
+            }
+        }
+        final float[] col = new float[4];
+        Fx.popupLayout("column", 400, 700, 680, 2, 140, 0, 0, 800, 1600, 2, col);
+        check(near(col[1], 628) && near(col[3], 548), "column spacing doubles at 2x");
     }
 
     static void popupWheelAndGridShape() {

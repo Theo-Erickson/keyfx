@@ -63,7 +63,7 @@ final class HoldFx extends FxModule {
         Charge(FxKey k, float x, long timeout) {
             this.k = k;
             this.timeout = timeout;
-            for (int i = 0; i < 48; i++) {
+            if ("fuse".equals(fx.settings.s("ring", "style"))) for (int i = 0; i < 48; i++) {
                 sparkX[i] = fx.dp(fx.rand(-6, 6));
                 sparkY[i] = fx.dp(fx.rand(-6, 6));
                 sparkHeat[i] = fx.rand(0, 1);
@@ -96,7 +96,7 @@ final class HoldFx extends FxModule {
                 // Sparks circle the key, faster and brighter as the hold charges
                 final float sr = fx.dp(6 + 3 * p);
                 for (int i = 0; i < 3; i++) {
-                    final double a = -Math.PI / 2 + t / fx.D(260 - 160 * p) + i * Math.PI * 2 / 3;
+                    final double a = -Math.PI / 2 + (t - t0) / fx.D(260 - 160 * p) + i * Math.PI * 2 / 3;
                     final float x = cx + (float) Math.cos(a) * rad, y = cy + (float) Math.sin(a) * rad * 0.85f;
                     final Paint g = fx.fill(0xFFFFFFFF);
                     g.setShader(new RadialGradient(x, y, sr, Fx.alpha(0xFFFFFFFF, fadeIn * s),
@@ -115,7 +115,7 @@ final class HoldFx extends FxModule {
                 c.drawPath(path, fx.stroke(Fx.alpha(0xFFFF8A3D, 0.8f * fadeIn * s), fx.dp(2)));
                 final float[] sp = edgePoint(k, start + burnt);
                 c.drawCircle(sp[0], sp[1], fx.dp(2.5f), fx.fill(Fx.alpha(0xFFFFF0B4, fadeIn * s)));
-                final int base = (int) (t / 40) % 16 * 3;
+                final int base = (int) (((t - t0) / 40) % 16) * 3;
                 for (int i = 0; i < 3; i++) {
                     final float px = sp[0] + sparkX[base + i], py = sp[1] + sparkY[base + i], sz = fx.dp(1.5f);
                     c.drawRect(px, py, px + sz, py + sz, fx.fill(Fx.fire(sparkHeat[base + i], fadeIn * s)));
@@ -143,7 +143,7 @@ final class HoldFx extends FxModule {
                 // Liquid: the key fills from the bottom with a moving wave on top
                 c.save();
                 c.clipPath(fx.roundRectPath(k.left, k.top, k.right, k.bottom, 9));
-                final float level = k.top + k.h() * (1 - p), ph = t / 140f;
+                final float level = k.top + k.h() * (1 - p), ph = (t - t0) / 140f;
                 final float wave = fx.dp(fx.settings.f("ring", "wave")) * (1 - p * 0.5f);
                 final Path path = fx.path();
                 path.moveTo(k.left, k.bottom);
@@ -216,8 +216,13 @@ final class HoldFx extends FxModule {
     private long moveAt;
     // Rail anchors: where the drag began, ratcheting by one line or letter per cursor step; d* ease toward them
     private float ax, ay, dax, day;
-    // Warp streaks (x, y, start, ux, uy, length) and step pulses (start, dx, dy, x, y)
-    private final ArrayList<float[]> streaks = new ArrayList<float[]>();
+    // When the trackpad opened; effect clocks run from here so floats stay precise on long uptimes
+    private long tpAt;
+    // Warp streaks (x, y, start, ux, uy, length), a fixed pool of which streakCount are live, and step pulses (start, dx, dy, x, y)
+    private final float[][] streaks = new float[60][6];
+    private int streakCount;
+    private static final float[] GLASS_STOPS = { 20f / 120f, 1 };
+    private final int[] glassColors = new int[2];
     private final ArrayList<float[]> pulses = new ArrayList<float[]>();
     // Random values for new streaks, picked once when the trackpad opens
     private final float[] streakX = new float[128], streakY = new float[128];
@@ -230,10 +235,11 @@ final class HoldFx extends FxModule {
         if (on) {
             tpX = x;
             tpY = y;
+            tpAt = fx.now();
             vx = vy = 0;
             ax = dax = x;
             ay = day = y;
-            streaks.clear();
+            streakCount = 0;
             pulses.clear();
             for (int i = 0; i < streakX.length; i++) {
                 streakX[i] = fx.rand(0, 1);
@@ -262,7 +268,7 @@ final class HoldFx extends FxModule {
         final int sx = Integer.signum(dx), sy = Integer.signum(dy);
         ax += sx * fx.dp(14);
         ay += sy * fx.dp(24);
-        pulses.add(new float[] { fx.now(), sx, sy, tpX, tpY });
+        if (fx.settings.b("trackpad", "steps")) pulses.add(new float[] { fx.now() - tpAt, sx, sy, tpX, tpY });
         fx.kick();
     }
 
@@ -283,9 +289,9 @@ final class HoldFx extends FxModule {
         final float dimA = dim * L * s;
         if ("glass".equals(fx.settings.s("trackpad", "look"))) {
             final Paint g = fx.fill(0xFFFFFFFF);
-            g.setShader(new RadialGradient(tpX, tpY, fx.dp(120),
-                    new int[] { Fx.alpha(dimColor, dimA * 0.15f), Fx.alpha(dimColor, dimA) },
-                    new float[] { 20f / 120f, 1 }, Shader.TileMode.CLAMP));
+            glassColors[0] = Fx.alpha(dimColor, dimA * 0.15f);
+            glassColors[1] = Fx.alpha(dimColor, dimA);
+            g.setShader(new RadialGradient(tpX, tpY, fx.dp(120), glassColors, GLASS_STOPS, Shader.TileMode.CLAMP));
             c.drawRect(kb, g);
         } else {
             c.drawRect(kb, fx.fill(Fx.alpha(dimColor, dimA)));
@@ -305,48 +311,56 @@ final class HoldFx extends FxModule {
         }
         final float speed = (float) Math.hypot(vx, vy);
         final boolean still = t - moveAt > 120;
+        final float rel = t - tpAt;
         final float ux = speed > 0 ? vx / speed : 0, uy = speed > 0 ? vy / speed : 0;
         if (fx.settings.b("trackpad", "warp")) {
             // Streaks race past against the direction of travel, faster and longer the faster you drag
-            if (!still && speed > 0.05f && streaks.size() < 60) {
-                for (int i = 0; i < 2; i++) {
+            if (!still && speed > 0.05f && streakCount < streaks.length) {
+                for (int i = 0; i < 2 && streakCount < streaks.length; i++) {
                     final float rx = streakX[streakAt % streakX.length], ry = streakY[streakAt % streakY.length];
                     streakAt++;
-                    streaks.add(new float[] { kb.left + rx * kb.width(), kb.top + ry * kb.height(), t, ux, uy,
-                            fx.dp(20 + speed * 60) });
+                    final float[] q = streaks[streakCount++];
+                    q[0] = kb.left + rx * kb.width();
+                    q[1] = kb.top + ry * kb.height();
+                    q[2] = rel;
+                    q[3] = ux;
+                    q[4] = uy;
+                    q[5] = fx.dp(20 + speed * 60);
                 }
             }
             final float life = fx.D(380);
-            for (int i = streaks.size() - 1; i >= 0; i--) {
-                final float[] q = streaks.get(i);
-                final float u = (t - q[2]) / life;
+            for (int i = streakCount - 1; i >= 0; i--) {
+                final float[] q = streaks[i];
+                final float u = (rel - q[2]) / life;
                 if (u >= 1) {
-                    streaks.remove(i);
+                    // Swap the last live streak into this slot
+                    streaks[i] = streaks[streakCount - 1];
+                    streaks[--streakCount] = q;
                     continue;
                 }
                 final float d = u * fx.dp(140), x = q[0] - q[3] * d, y = q[1] - q[4] * d;
                 c.drawLine(x, y, x - q[3] * q[5], y - q[4] * q[5],
-                        cap(fx.stroke(Fx.alpha(fx.accent(), 0.55f * (1 - u) * L * s), fx.dp(1.5f))));
+                        fx.stroke(Fx.alpha(fx.accent(), 0.55f * (1 - u) * L * s), fx.dp(1.5f)));
             }
         }
         if (fx.settings.b("trackpad", "chevrons") && !still && speed > 0.03f) {
             // Three arrows ahead of the finger, rippling outward in the travel direction
             final float ang = (float) Math.toDegrees(Math.atan2(uy, ux));
             for (int i = 0; i < 3; i++) {
-                final float ph = ((t / fx.D(300)) + i / 3f) % 1, d = fx.dp(34) + ph * fx.dp(40);
+                final float ph = ((rel / fx.D(300)) + i / 3f) % 1, d = fx.dp(34) + ph * fx.dp(40);
                 c.save();
                 c.translate(tpX + ux * d, tpY + uy * d);
                 c.rotate(ang);
-                chevron(c, cap(fx.stroke(Fx.alpha(fx.accent(), (1 - ph) * 0.9f * L * s), fx.dp(2.5f))), -5, 4, 8);
+                chevron(c, fx.stroke(Fx.alpha(fx.accent(), (1 - ph) * 0.9f * L * s), fx.dp(2.5f)), -5, 4, 8);
                 c.restore();
             }
         }
-        fx.stroke(0, 0).setStrokeCap(Paint.Cap.BUTT);
         return level != target || target > 0;
     }
 
     /** The trackpad's pattern, by look. Every look stays put under the finger. */
     private void drawLook(Canvas c, long t, RectF kb, float L, float s) {
+        final float rel = t - tpAt;
         final String look = fx.settings.s("trackpad", "look");
         final float a = fx.settings.f("trackpad", "grid") * L * s;
         final int col = fx.accent();
@@ -356,11 +370,11 @@ final class HoldFx extends FxModule {
             final float step = fx.dp(22);
             for (float x = kb.left + step / 2; x < kb.right; x += step) {
                 c.drawLine(x, kb.top, x, kb.bottom,
-                        cap(fx.stroke(Fx.alpha(col, (0.12f + 0.75f * near(Math.abs(x - fx0), fx.dp(70))) * a), fx.dp(1))));
+                        fx.stroke(Fx.alpha(col, (0.12f + 0.75f * near(Math.abs(x - fx0), fx.dp(70))) * a), fx.dp(1)));
             }
             for (float y = kb.top + step / 2; y < kb.bottom; y += step) {
                 c.drawLine(kb.left, y, kb.right, y,
-                        cap(fx.stroke(Fx.alpha(col, (0.12f + 0.75f * near(Math.abs(y - fy0), fx.dp(70))) * a), fx.dp(1))));
+                        fx.stroke(Fx.alpha(col, (0.12f + 0.75f * near(Math.abs(y - fy0), fx.dp(70))) * a), fx.dp(1)));
             }
         } else if ("dots".equals(look)) {
             // A still dot matrix that swells and brightens around the finger
@@ -374,7 +388,7 @@ final class HoldFx extends FxModule {
         } else if ("ripple".equals(look)) {
             // Sonar: rings keep pulsing out from the finger
             for (int i = 0; i < 4; i++) {
-                final float r = ((t / fx.D(14)) + i * 30) % 120;
+                final float r = ((rel / fx.D(14)) + i * 30) % 120;
                 c.drawCircle(fx0, fy0, fx.dp(r), fx.stroke(Fx.alpha(col, near(r, 120) * 0.8f * a), fx.dp(1.5f)));
             }
         } else if (!"glass".equals(look)) {
@@ -393,8 +407,8 @@ final class HoldFx extends FxModule {
             for (float y = first; y < kb.bottom; y += lineH) {
                 if (y < kb.top) continue;
                 final boolean on = y == active;
-                c.drawLine(kb.left + fx.dp(8), y, kb.right - fx.dp(8), y, cap(fx.stroke(Fx.alpha(col,
-                        (on ? 0.95f : 0.16f + 0.3f * near(Math.abs(y - fy0), fx.dp(80))) * a), fx.dp(on ? 2 : 1))));
+                c.drawLine(kb.left + fx.dp(8), y, kb.right - fx.dp(8), y, fx.stroke(Fx.alpha(col,
+                        (on ? 0.95f : 0.16f + 0.3f * near(Math.abs(y - fy0), fx.dp(80))) * a), fx.dp(on ? 2 : 1)));
             }
             if (!Float.isNaN(active)) {
                 final float firstX = dax - (float) Math.ceil((dax - kb.left) / charW) * charW;
@@ -402,7 +416,7 @@ final class HoldFx extends FxModule {
                     final float n = near(Math.abs(x - fx0), fx.dp(110));
                     if (n <= 0) continue;
                     c.drawLine(x, active - fx.dp(3 + 3 * n), x, active + fx.dp(3 + 3 * n),
-                            cap(fx.stroke(Fx.alpha(col, 0.85f * n * a), fx.dp(1.5f))));
+                            fx.stroke(Fx.alpha(col, 0.85f * n * a), fx.dp(1.5f)));
                 }
             }
         }
@@ -411,7 +425,7 @@ final class HoldFx extends FxModule {
             final float life = fx.D(320);
             for (int i = pulses.size() - 1; i >= 0; i--) {
                 final float[] q = pulses.get(i);
-                final float u = (t - q[0]) / life;
+                final float u = (rel - q[0]) / life;
                 if (u >= 1) {
                     pulses.remove(i);
                     continue;
@@ -420,7 +434,7 @@ final class HoldFx extends FxModule {
                 c.save();
                 c.translate(q[3] + q[1] * d, q[4] + q[2] * d);
                 c.rotate((float) Math.toDegrees(Math.atan2(q[2], q[1])));
-                chevron(c, cap(fx.stroke(Fx.alpha(col, (1 - u) * L * s), fx.dp(2.5f))), -4, 3, 7);
+                chevron(c, fx.stroke(Fx.alpha(col, (1 - u) * L * s), fx.dp(2.5f)), -4, 3, 7);
                 c.restore();
             }
         }
@@ -435,26 +449,31 @@ final class HoldFx extends FxModule {
         c.drawPath(path, p);
     }
 
-    private static Paint cap(Paint p) {
-        p.setStrokeCap(Paint.Cap.ROUND);
-        return p;
-    }
-
     private static float near(float d, float r) {
         return Math.max(0, 1 - d / r);
     }
 
+    // Reused result of edgePoint, so sampling an outline allocates nothing
+    private final float[] edge = new float[2];
+
     /** A point on the key's outline, walking clockwise from the top-left corner. */
-    private static float[] edgePoint(FxKey k, float d) {
+    private float[] edgePoint(FxKey k, float d) {
         final float w = k.w(), h = k.h(), per = 2 * (w + h);
         d = ((d % per) + per) % per;
-        if (d < w) return new float[] { k.left + d, k.top };
-        d -= w;
-        if (d < h) return new float[] { k.right, k.top + d };
-        d -= h;
-        if (d < w) return new float[] { k.right - d, k.bottom };
-        d -= w;
-        return new float[] { k.left, k.bottom - d };
+        if (d < w) {
+            edge[0] = k.left + d;
+            edge[1] = k.top;
+        } else if (d < w + h) {
+            edge[0] = k.right;
+            edge[1] = k.top + d - w;
+        } else if (d < 2 * w + h) {
+            edge[0] = k.right - (d - w - h);
+            edge[1] = k.bottom;
+        } else {
+            edge[0] = k.left;
+            edge[1] = k.bottom - (d - 2 * w - h);
+        }
+        return edge;
     }
 
     @Override
@@ -475,7 +494,7 @@ final class HoldFx extends FxModule {
         level = target = 0;
         vx = vy = 0;
         moveAt = 0;
-        streaks.clear();
+        streakCount = 0;
         pulses.clear();
         last = 0;
     }
