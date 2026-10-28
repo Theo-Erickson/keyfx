@@ -123,7 +123,7 @@ fx.hide(Bitmap snapshot, Runnable onDone);  // CAP_HIDE_ANIMATION hosts only
 
 // Hosts that draw more than the overlay
 fx.setHost(FxHost host);                // redrawKeys() and wordChanged() callbacks
-fx.look(FxKey k, KeyLook out);          // CAP_KEY_TRANSFORM: scale, move, fade this real key now
+fx.look(FxKey k, KeyLook out);          // CAP_KEY_TRANSFORM: scale, move, fade or relabel (KeyLook.label) this real key now
 fx.showNeedsSnapshot();                 // false: call show(null, onDone), keys animate through look()
 fx.word();                              // CAP_SUGGESTION_STYLE: the predicted word and lit letters
 fx.popupLayout(FxKey k, int n, RectF bounds, float[] outXY);  // CAP_POPUP_LAYOUT: bloom arc
