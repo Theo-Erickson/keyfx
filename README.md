@@ -61,7 +61,7 @@ keyfx is a library, so it has no APK of its own. To try the effects on a phone, 
 | Install a standalone keyboard with effects built in (no root; a few effects are still to come) | [FXboard releases](https://github.com/Theo-Erickson/fxboard/releases) |
 | Try the effects in a browser and design my own settings | [Open the lab](https://theo-erickson.github.io/keyfx/) (runs in any browser, phone included) |
 | Use keyfx in my own keyboard | [Adding keyfx to a project](#adding-keyfx-to-a-project) |
-| Get the source | [Download ZIP](https://github.com/Theo-Erickson/keyfx/archive/refs/heads/main.zip) or `git clone https://github.com/Theo-Erickson/keyfx.git` |
+| Get the source | [keyfx releases](https://github.com/Theo-Erickson/keyfx/releases) (a source zip per version) or `git clone https://github.com/Theo-Erickson/keyfx.git` |
 
 ## The effects
 
