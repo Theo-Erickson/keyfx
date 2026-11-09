@@ -33,7 +33,8 @@ jobs:
         run: |
           ANDROID_JAR="$(ls -d "$ANDROID_HOME"/platforms/android-*/android.jar | sort -V | tail -1)"
           echo "Using $ANDROID_JAR"
-          ANDROID_JAR="$ANDROID_JAR" ./test.sh
+          # test.sh is committed from Windows without the executable bit
+          ANDROID_JAR="$ANDROID_JAR" bash test.sh
 
   release:
     needs: test
