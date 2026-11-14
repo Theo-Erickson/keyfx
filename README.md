@@ -155,7 +155,7 @@ fx.setLayout(FxLayout layout);          // keys + keyboard rect + suggestion rec
 fx.reload();                            // re-read settings (live reload)
 fx.setSystemAccent(int color);          // Material You accent for accent = "system"
 fx.setEnabled(boolean animationsOn);    // off when Android's "Remove animations" is on
-fx.setPrivateField(KeyFx.isPrivateInput(editorInfo.inputType));  // password fields: no effects at all
+fx.setInputField(editorInfo.inputType, editorInfo.imeOptions);  // privacy mode: no effects in password or incognito fields
 fx.isEnabled();                         // false when either is off: send no events, read no text
 
 // Events
@@ -186,7 +186,7 @@ KeyFx.capTitle(int cap); KeyFx.capReason(int cap);  // wording for settings scre
 1. **Attach.** Create a `KeyFx` and add it to an overlay that covers the keyboard window.
 2. **Layout.** Build an `FxLayout` of `FxKey`s in the Drawable's coordinates, with the keyboard and suggestion bar rectangles, and call `setLayout()` whenever the keyboard changes (new layout, rotation, symbols page).
 3. **Events.** Call the event methods from the points where your keyboard handles touches, typed keys, backspace and swipes.
-4. **Private fields.** When input starts, call `setPrivateField(KeyFx.isPrivateInput(editorInfo.inputType))`. In password fields, shown or hidden, keyfx then draws nothing, so no effect gives away what is typed. Check `isEnabled()` before reading the app's text for backspace effects, so nothing is read there either. A choice value can need a capability too (`Field.valueRequires`); hosts without it don't offer that value, and a saved one reads as the default.
+4. **Privacy mode.** When input starts, call `setInputField(editorInfo.inputType, editorInfo.imeOptions)`. In password fields, shown or hidden, keyfx then draws nothing, so no effect gives away what is typed. It does the same in incognito fields (private browser tabs, and apps that set `IME_FLAG_NO_PERSONALIZED_LEARNING`) unless the user turns off the Privacy section's "Off in private tabs and incognito fields". The Privacy section's "Always on" switch keeps effects off in every field; hosts can offer a quick toggle for it by flipping the boolean preference `KeyFx.PRIVACY_ALWAYS_KEY`. Check `isEnabled()` before reading the app's text for backspace effects, so nothing is read there either. A choice value can need a capability too (`Field.valueRequires`); hosts without it don't offer that value, and a saved one reads as the default.
 5. **Capabilities.** Declare what your host can do beyond drawing on top, with the `KeyFx.CAP_*` flags. Settings and sections that need a missing flag are hidden from that host's settings screen.
 
    | Flag | Lets keyfx |
